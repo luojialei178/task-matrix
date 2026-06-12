@@ -380,7 +380,10 @@ footer{
     <button id="themeDot" title="切换主题"></button>
   </div>
   <div class="header-btns">
+    <span id="fileIndicator" style="font-size:11px;letter-spacing:-.01em;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;align-self:center;"></span>
     <button class="btn" id="clearDoneBtn">清除已完成</button>
+    <button class="btn btn-subtle" id="openFileBtn" title="打开本地 JSON 文件（每次修改自动写入）">📂 打开文件</button>
+    <button class="btn btn-subtle" id="newFileBtn" title="新建本地 JSON 文件保存当前数据">💾 新建文件</button>
     <button class="btn btn-subtle" id="exportBtn">导出 JSON</button>
     <button class="btn btn-subtle" id="importBtn">导入 JSON</button>
     <input type="file" id="importFile" accept=".json" style="display:none"/>
@@ -409,7 +412,7 @@ footer{
     <div class="leg"><div class="leg-dot" style="background:#8e8e93"></div>扩展</div>
     <div class="leg"><div class="leg-dot" style="background:#34c759"></div>✓ 完成</div>
   </div>
-  <div class="hint">拖拽行头换位 · 双击行头编辑 · 勾选完成 · 自动保存</div>
+  <div class="hint">拖拽行头换位 · 双击行头编辑 · 双击卡片编辑 · 勾选完成 · 自动保存</div>
 </footer>
 
 <script>
@@ -417,6 +420,7 @@ const STORAGE_KEY  = 'task-matrix-v6';
 const THEME_KEY    = 'task-matrix-theme';
 const ROW_NAME_KEY = 'task-matrix-rownames';
 const ROW_ORD_KEY  = 'task-matrix-roworder';
+const FILE_HANDLE_KEY = 'task-matrix-fsh-name'; // 仅存文件名，handle 需重新授权
 const BASE = 5;
 const DEFAULT_NAMES = ['P1','P2','P3','P4','P5'];
 const COL_CLS = ['col-p0','col-p1','col-p2','col-p3','col-p4','col-ext'];
@@ -425,6 +429,12 @@ const ROW_CLS = ['row-p0','row-p1','row-p2','row-p3','row-p4','row-ext'];
 let state    = loadState();
 let rowNames = loadRowNames();
 let rowOrder = loadRowOrder();
+
+// ─── File System Access API ───────────────────────────────────────────────
+let _fileHandle = null; // FileSystemFileHandle
+let _fileSaveTimer = null;
+
+const FSA_SUPPORTED = ('showOpenFilePicker' in window);
 
 function loadState(){
   try{ const d=JSON.parse(localStorage.getItem(STORAGE_KEY)); if(d&&typeof d==='object') return d; }catch(e){}
@@ -438,9 +448,127 @@ function loadRowOrder(){
   try{ const d=JSON.parse(localStorage.getItem(ROW_ORD_KEY)); if(Array.isArray(d)) return d; }catch(e){}
   return null;
 }
-function save(){ localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }
-function saveRowNames(){ localStorage.setItem(ROW_NAME_KEY,JSON.stringify(rowNames)); }
-function saveRowOrder(){ localStorage.setItem(ROW_ORD_KEY,JSON.stringify(rowOrder)); }
+
+// 合并所有数据为一个对象写入文件
+function buildSnapshot(){
+  return {state, rowNames, rowOrder};
+}
+function applySnapshot(d){
+  if(d.state)    state    = d.state;
+  if(d.rowNames) rowNames = d.rowNames;
+  if(d.rowOrder !== undefined) rowOrder = d.rowOrder || null;
+}
+
+// 写入文件（防抖 300ms）
+async function writeFile(){
+  if(!_fileHandle) return;
+  try{
+    const writable = await _fileHandle.createWritable();
+    await writable.write(JSON.stringify(buildSnapshot(), null, 2));
+    await writable.close();
+    updateFileIndicator(true);
+  }catch(err){
+    console.warn('写入文件失败', err);
+    updateFileIndicator(false, err.message);
+  }
+}
+function scheduleSave(){
+  clearTimeout(_fileSaveTimer);
+  _fileSaveTimer = setTimeout(writeFile, 300);
+}
+
+// localStorage 兜底（同步）
+function save(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  scheduleSave();
+}
+function saveRowNames(){
+  localStorage.setItem(ROW_NAME_KEY, JSON.stringify(rowNames));
+  scheduleSave();
+}
+function saveRowOrder(){
+  localStorage.setItem(ROW_ORD_KEY, JSON.stringify(rowOrder));
+  scheduleSave();
+}
+
+// 更新顶栏文件指示
+function updateFileIndicator(ok, errMsg){
+  const el = document.getElementById('fileIndicator');
+  if(!el) return;
+  if(!_fileHandle){ el.textContent=''; el.title=''; return; }
+  if(ok){
+    el.textContent = '● ' + _fileHandle.name;
+    el.title = '已连接本地文件，数据自动保存';
+    el.style.color = '#34c759';
+  } else {
+    el.textContent = '⚠ ' + _fileHandle.name;
+    el.title = '写入失败: ' + (errMsg||'');
+    el.style.color = '#ff9500';
+  }
+}
+
+// 选择 / 新建文件并读取
+async function openFileAndLoad(){
+  if(!FSA_SUPPORTED){
+    alert('当前浏览器不支持 File System Access API（需要 Chrome 86+）。\n数据将继续保存在 localStorage。');
+    return;
+  }
+  try{
+    const [handle] = await window.showOpenFilePicker({
+      types:[{description:'JSON 数据文件', accept:{'application/json':['.json']}}],
+      multiple:false
+    });
+    await loadFromHandle(handle);
+  }catch(e){ if(e.name!=='AbortError') console.warn(e); }
+}
+
+async function newFileAndSave(){
+  if(!FSA_SUPPORTED) return;
+  try{
+    const handle = await window.showSaveFilePicker({
+      suggestedName:'task-matrix.json',
+      types:[{description:'JSON 数据文件', accept:{'application/json':['.json']}}]
+    });
+    _fileHandle = handle;
+    localStorage.setItem(FILE_HANDLE_KEY, handle.name);
+    await writeFile();
+    updateFileIndicator(true);
+  }catch(e){ if(e.name!=='AbortError') console.warn(e); }
+}
+
+async function loadFromHandle(handle){
+  try{
+    const perm = await handle.queryPermission({mode:'readwrite'});
+    if(perm !== 'granted'){
+      const req = await handle.requestPermission({mode:'readwrite'});
+      if(req !== 'granted'){ alert('需要读写权限才能使用本地文件功能。'); return; }
+    }
+    const file = await handle.getFile();
+    const text = await file.text();
+    const d = JSON.parse(text);
+    if(!d || typeof d !== 'object') throw new Error('格式错误');
+    if(!confirm('从文件加载将覆盖当前数据，确认继续？')) return;
+    applySnapshot(d);
+    // 同步到 localStorage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(ROW_NAME_KEY, JSON.stringify(rowNames));
+    if(rowOrder) localStorage.setItem(ROW_ORD_KEY, JSON.stringify(rowOrder));
+    else localStorage.removeItem(ROW_ORD_KEY);
+    _fileHandle = handle;
+    localStorage.setItem(FILE_HANDLE_KEY, handle.name);
+    updateFileIndicator(true);
+    buildGrid();
+  }catch(err){
+    alert('读取文件失败：' + err.message);
+  }
+}
+
+async function disconnectFile(){
+  _fileHandle = null;
+  localStorage.removeItem(FILE_HANDLE_KEY);
+  updateFileIndicator(false);
+  document.getElementById('fileIndicator').textContent = '';
+}
 
 function totalCols(){ return BASE+state.extraCols; }
 function totalRows(){ return BASE+state.extraRows; }
@@ -620,7 +748,30 @@ function makeCard(key,idx){
   const del=mkEl('button','task-del','×'); del.title='删除';
   del.addEventListener('click',e=>{ e.stopPropagation(); state.cells[key].splice(idx,1); save(); refreshCell(key); });
   card.appendChild(chk); card.appendChild(txt); card.appendChild(del);
-  card.addEventListener('dragstart',e=>{ card.classList.add('dragging'); e.dataTransfer.setData('text/plain',JSON.stringify({fromKey:key,idx})); e.dataTransfer.effectAllowed='move'; });
+  // 双击编辑
+  txt.addEventListener('dblclick',e=>{
+    e.stopPropagation();
+    if(card.querySelector('.card-edit-input')) return;
+    card.draggable=false;
+    txt.style.display='none';
+    const inp=document.createElement('input');
+    inp.className='task-input card-edit-input';
+    inp.value=t.text; inp.maxLength=80;
+    inp.style.cssText='flex:1;margin:0;padding:2px 5px;font-size:12px;';
+    card.insertBefore(inp, del);
+    inp.focus(); inp.select();
+    function commitEdit(){
+      const v=inp.value.trim();
+      if(v && v!==t.text){ state.cells[key][idx].text=v; save(); }
+      refreshCell(key);
+    }
+    inp.addEventListener('keydown',e2=>{
+      if(e2.key==='Enter'){ e2.preventDefault(); commitEdit(); }
+      else if(e2.key==='Escape'){ refreshCell(key); }
+    });
+    inp.addEventListener('blur',()=>{ setTimeout(()=>{ if(card.querySelector('.card-edit-input')) commitEdit(); },150); });
+  });
+  card.addEventListener('dragstart',e=>{ if(card.querySelector('.card-edit-input')) { e.preventDefault(); return; } card.classList.add('dragging'); e.dataTransfer.setData('text/plain',JSON.stringify({fromKey:key,idx})); e.dataTransfer.effectAllowed='move'; });
   card.addEventListener('dragend',()=>card.classList.remove('dragging'));
   return card;
 }
@@ -665,8 +816,12 @@ document.getElementById('clearDoneBtn').addEventListener('click',()=>{
   Object.keys(state.cells).forEach(k=>{ state.cells[k]=(state.cells[k]||[]).filter(t=>!t.done); });
   save(); buildGrid();
 });
+
+document.getElementById('openFileBtn').addEventListener('click', openFileAndLoad);
+document.getElementById('newFileBtn').addEventListener('click', newFileAndSave);
+
 document.getElementById('exportBtn').addEventListener('click',()=>{
-  const blob=new Blob([JSON.stringify({state,rowNames,rowOrder},null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify(buildSnapshot(),null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='task-matrix.json'; a.click();
 });
 
@@ -703,6 +858,12 @@ applyTheme(localStorage.getItem(THEME_KEY)||'dark');
 document.getElementById('themeDot').addEventListener('click',()=>{
   applyTheme(document.body.classList.contains('dark')?'light':'dark');
 });
+
+// 不支持 FSA 时隐藏文件按钮
+if(!FSA_SUPPORTED){
+  document.getElementById('openFileBtn').style.display='none';
+  document.getElementById('newFileBtn').style.display='none';
+}
 
 buildGrid();
 </script>
