@@ -382,8 +382,6 @@ footer{
   <div class="header-btns">
     <span id="fileIndicator" style="font-size:11px;letter-spacing:-.01em;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;align-self:center;"></span>
     <button class="btn" id="clearDoneBtn">清除已完成</button>
-    <button class="btn btn-subtle" id="openFileBtn" title="打开本地 JSON 文件（每次修改自动写入）">📂 打开文件</button>
-    <button class="btn btn-subtle" id="newFileBtn" title="新建本地 JSON 文件保存当前数据">💾 新建文件</button>
     <button class="btn btn-subtle" id="exportBtn">导出 JSON</button>
     <button class="btn btn-subtle" id="importBtn">导入 JSON</button>
     <input type="file" id="importFile" accept=".json" style="display:none"/>
@@ -507,67 +505,22 @@ function updateFileIndicator(ok, errMsg){
   }
 }
 
-// 选择 / 新建文件并读取
-async function openFileAndLoad(){
-  if(!FSA_SUPPORTED){
-    alert('当前浏览器不支持 File System Access API（需要 Chrome 86+）。\n数据将继续保存在 localStorage。');
-    return;
-  }
-  try{
-    const [handle] = await window.showOpenFilePicker({
-      types:[{description:'JSON 数据文件', accept:{'application/json':['.json']}}],
-      multiple:false
-    });
-    await loadFromHandle(handle);
-  }catch(e){ if(e.name!=='AbortError') console.warn(e); }
-}
+// （打开文件/新建文件已合并为首次输入时自动触发）
 
-async function newFileAndSave(){
-  if(!FSA_SUPPORTED) return;
+// 首次添加任务时触发：弹出「创建持久化文件」选择器
+async function ensureFileHandle(){
+  if(_fileHandle || !FSA_SUPPORTED) return;
   try{
     const handle = await window.showSaveFilePicker({
       suggestedName:'task-matrix.json',
-      types:[{description:'JSON 数据文件', accept:{'application/json':['.json']}}]
+      types:[{description:'持久化数据文件', accept:{'application/json':['.json']}}],
+      startIn:'documents'
     });
     _fileHandle = handle;
     localStorage.setItem(FILE_HANDLE_KEY, handle.name);
     await writeFile();
     updateFileIndicator(true);
   }catch(e){ if(e.name!=='AbortError') console.warn(e); }
-}
-
-async function loadFromHandle(handle){
-  try{
-    const perm = await handle.queryPermission({mode:'readwrite'});
-    if(perm !== 'granted'){
-      const req = await handle.requestPermission({mode:'readwrite'});
-      if(req !== 'granted'){ alert('需要读写权限才能使用本地文件功能。'); return; }
-    }
-    const file = await handle.getFile();
-    const text = await file.text();
-    const d = JSON.parse(text);
-    if(!d || typeof d !== 'object') throw new Error('格式错误');
-    if(!confirm('从文件加载将覆盖当前数据，确认继续？')) return;
-    applySnapshot(d);
-    // 同步到 localStorage
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    localStorage.setItem(ROW_NAME_KEY, JSON.stringify(rowNames));
-    if(rowOrder) localStorage.setItem(ROW_ORD_KEY, JSON.stringify(rowOrder));
-    else localStorage.removeItem(ROW_ORD_KEY);
-    _fileHandle = handle;
-    localStorage.setItem(FILE_HANDLE_KEY, handle.name);
-    updateFileIndicator(true);
-    buildGrid();
-  }catch(err){
-    alert('读取文件失败：' + err.message);
-  }
-}
-
-async function disconnectFile(){
-  _fileHandle = null;
-  localStorage.removeItem(FILE_HANDLE_KEY);
-  updateFileIndicator(false);
-  document.getElementById('fileIndicator').textContent = '';
 }
 
 function totalCols(){ return BASE+state.extraCols; }
@@ -805,7 +758,7 @@ function showInput(cell,key){
   inp.placeholder='输入任务，回车确认，Esc取消'; inp.maxLength=80;
   cell.insertBefore(inp,ab); inp.focus();
   inp.addEventListener('keydown',e=>{
-    if(e.key==='Enter'){ const text=inp.value.trim(); if(text){ if(!state.cells[key]) state.cells[key]=[]; state.cells[key].push({text,done:false}); save(); } renderCellContent(cell,key); }
+    if(e.key==='Enter'){ const text=inp.value.trim(); if(text){ if(!state.cells[key]) state.cells[key]=[]; state.cells[key].push({text,done:false}); save(); ensureFileHandle(); } renderCellContent(cell,key); }
     else if(e.key==='Escape') renderCellContent(cell,key);
   });
   inp.addEventListener('blur',()=>{ setTimeout(()=>{ if(cell.querySelector('.task-input')) renderCellContent(cell,key); },150); });
@@ -816,9 +769,6 @@ document.getElementById('clearDoneBtn').addEventListener('click',()=>{
   Object.keys(state.cells).forEach(k=>{ state.cells[k]=(state.cells[k]||[]).filter(t=>!t.done); });
   save(); buildGrid();
 });
-
-document.getElementById('openFileBtn').addEventListener('click', openFileAndLoad);
-document.getElementById('newFileBtn').addEventListener('click', newFileAndSave);
 
 document.getElementById('exportBtn').addEventListener('click',()=>{
   const blob=new Blob([JSON.stringify(buildSnapshot(),null,2)],{type:'application/json'});
@@ -836,15 +786,18 @@ document.getElementById('importFile').addEventListener('change', e=>{
       const d = JSON.parse(ev.target.result);
       if(!d || typeof d !== 'object') throw new Error('格式错误');
       if(!confirm('导入将覆盖当前所有数据，确认继续？')) return;
-      if(d.state)    { state = d.state;       localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-      if(d.rowNames) { rowNames = d.rowNames; localStorage.setItem(ROW_NAME_KEY, JSON.stringify(rowNames)); }
-      if(d.rowOrder) { rowOrder = d.rowOrder; localStorage.setItem(ROW_ORD_KEY, JSON.stringify(rowOrder)); }
-      else           { rowOrder = null;       localStorage.removeItem(ROW_ORD_KEY); }
+      applySnapshot(d);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(ROW_NAME_KEY, JSON.stringify(rowNames));
+      if(rowOrder) localStorage.setItem(ROW_ORD_KEY, JSON.stringify(rowOrder));
+      else localStorage.removeItem(ROW_ORD_KEY);
+      // 若已有文件连接，导入后直接覆写该文件
+      scheduleSave();
       buildGrid();
     }catch(err){
       alert('导入失败：文件格式不正确\n'+err.message);
     }
-    e.target.value=''; // reset so same file can be re-imported
+    e.target.value='';
   };
   reader.readAsText(file);
 });
@@ -858,12 +811,6 @@ applyTheme(localStorage.getItem(THEME_KEY)||'dark');
 document.getElementById('themeDot').addEventListener('click',()=>{
   applyTheme(document.body.classList.contains('dark')?'light':'dark');
 });
-
-// 不支持 FSA 时隐藏文件按钮
-if(!FSA_SUPPORTED){
-  document.getElementById('openFileBtn').style.display='none';
-  document.getElementById('newFileBtn').style.display='none';
-}
 
 buildGrid();
 </script>
