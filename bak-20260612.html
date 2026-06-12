@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<title>任务优先级矩阵</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+
+:root{
+  --radius-sm:6px;
+  --radius-md:8px;
+  --radius-lg:10px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+}
+
+body{
+  font-family:var(--font);
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+  transition:background .25s,color .25s;
+}
+
+/* ══════════════════════════════════
+   DARK
+══════════════════════════════════ */
+body.dark{
+  background:#1c1c1e;
+  color:rgba(255,255,255,.85);
+}
+
+/* header */
+body.dark header{
+  background:rgba(40,40,42,.8);
+  border-bottom:1px solid rgba(255,255,255,.07);
+  backdrop-filter:saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+}
+body.dark header h1{color:rgba(255,255,255,.88);}
+body.dark .btn{background:rgba(255,255,255,.08);color:rgba(255,255,255,.65);}
+body.dark .btn:hover{background:rgba(255,255,255,.14);color:rgba(255,255,255,.9);}
+body.dark .btn.btn-subtle{background:rgba(255,255,255,.16);color:rgba(255,255,255,.8);}
+body.dark .btn.btn-subtle:hover{background:rgba(255,255,255,.24);color:#fff;}
+body.dark #themeDot{background:#ffffff;}
+body.dark .x-axis-bar span,body.dark .y-axis-label{color:rgba(255,255,255,.28);}
+
+/* footer */
+body.dark footer{
+  background:rgba(40,40,42,.7);
+  border-top:1px solid rgba(255,255,255,.06);
+  backdrop-filter:blur(16px);
+}
+body.dark .leg{color:rgba(255,255,255,.35);}
+body.dark .hint{color:rgba(255,255,255,.2);}
+
+/* scrollbar */
+body.dark .grid-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);}
+
+/* expand btns */
+body.dark .expand-col-btn,body.dark .expand-row-btn{
+  background:rgba(255,255,255,.04);
+  border-color:rgba(255,255,255,.1);
+  color:rgba(255,255,255,.25);
+}
+body.dark .expand-col-btn:hover,body.dark .expand-row-btn:hover{
+  background:rgba(255,255,255,.09);color:rgba(255,255,255,.6);border-color:rgba(255,255,255,.2);
+}
+
+/* del axis btn */
+body.dark .del-axis{color:rgba(255,255,255,.2)!important;}
+body.dark .del-axis:hover{color:#ff453a!important;}
+
+/* cell */
+body.dark .c-ext{background:rgba(99,99,102,.18);border-color:rgba(99,99,102,.3);}
+body.dark .c-r0-c0{background:rgba(120,20,20,.55);border-color:rgba(180,40,40,.3);--card-bg:rgba(150,30,30,.7);--card-border:rgba(200,60,60,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r0-c1{background:rgba(110,45,10,.55);border-color:rgba(170,70,20,.3);--card-bg:rgba(140,60,15,.7);--card-border:rgba(190,90,30,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r0-c2{background:rgba(100,75,5,.55);border-color:rgba(160,120,10,.3);--card-bg:rgba(130,95,10,.7);--card-border:rgba(180,145,20,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r0-c3{background:rgba(20,75,25,.55);border-color:rgba(40,130,45,.3);--card-bg:rgba(25,95,30,.7);--card-border:rgba(50,155,55,.4);--card-done-bg:rgba(25,70,25,.7);}
+body.dark .c-r0-c4{background:rgba(15,30,110,.55);border-color:rgba(30,55,180,.3);--card-bg:rgba(20,40,140,.7);--card-border:rgba(40,70,200,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r1-c0{background:rgba(100,45,10,.5);border-color:rgba(160,75,20,.3);--card-bg:rgba(130,58,14,.65);--card-border:rgba(180,95,30,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r1-c1{background:rgba(95,60,8,.5);border-color:rgba(155,95,15,.3);--card-bg:rgba(125,78,12,.65);--card-border:rgba(175,115,22,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r1-c2{background:rgba(90,80,5,.5);border-color:rgba(148,128,10,.3);--card-bg:rgba(118,102,8,.65);--card-border:rgba(168,148,18,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r1-c3{background:rgba(18,68,20,.5);border-color:rgba(36,118,40,.3);--card-bg:rgba(22,88,25,.65);--card-border:rgba(45,140,50,.4);--card-done-bg:rgba(25,70,25,.7);}
+body.dark .c-r1-c4{background:rgba(12,28,100,.5);border-color:rgba(25,50,168,.3);--card-bg:rgba(16,36,128,.65);--card-border:rgba(35,62,188,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r2-c0{background:rgba(80,68,5,.45);border-color:rgba(130,110,10,.3);--card-bg:rgba(105,88,8,.6);--card-border:rgba(155,130,18,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r2-c1{background:rgba(78,72,5,.45);border-color:rgba(125,115,10,.3);--card-bg:rgba(100,95,8,.6);--card-border:rgba(150,140,18,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r2-c2{background:rgba(72,72,5,.45);border-color:rgba(118,118,.3,.3);--card-bg:rgba(96,96,8,.6);--card-border:rgba(142,142,16,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r2-c3{background:rgba(16,65,18,.45);border-color:rgba(32,108,36,.3);--card-bg:rgba(20,85,22,.6);--card-border:rgba(40,128,44,.4);--card-done-bg:rgba(25,70,25,.7);}
+body.dark .c-r2-c4{background:rgba(10,26,90,.45);border-color:rgba(20,45,152,.3);--card-bg:rgba(14,34,115,.6);--card-border:rgba(28,56,172,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r3-c0{background:rgba(15,62,18,.45);border-color:rgba(30,108,35,.3);--card-bg:rgba(20,82,24,.6);--card-border:rgba(40,130,46,.4);--card-done-bg:rgba(25,70,25,.7);}
+body.dark .c-r3-c1{background:rgba(14,65,16,.45);border-color:rgba(28,112,32,.3);--card-bg:rgba(18,86,20,.6);--card-border:rgba(36,134,42,.4);--card-done-bg:rgba(25,70,25,.7);}
+body.dark .c-r3-c2{background:rgba(14,65,16,.45);border-color:rgba(28,110,32,.3);--card-bg:rgba(18,86,20,.6);--card-border:rgba(36,132,42,.4);--card-done-bg:rgba(25,70,25,.7);}
+body.dark .c-r3-c3{background:rgba(14,62,18,.45);border-color:rgba(28,106,34,.3);--card-bg:rgba(18,82,24,.6);--card-border:rgba(36,128,44,.4);--card-done-bg:rgba(25,70,25,.7);}
+body.dark .c-r3-c4{background:rgba(10,24,82,.45);border-color:rgba(20,42,140,.3);--card-bg:rgba(14,32,105,.6);--card-border:rgba(26,52,160,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r4-c0{background:rgba(10,20,82,.4);border-color:rgba(20,38,140,.3);--card-bg:rgba(14,28,106,.55);--card-border:rgba(26,48,160,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r4-c1{background:rgba(10,20,82,.4);border-color:rgba(20,38,140,.3);--card-bg:rgba(14,28,106,.55);--card-border:rgba(26,48,160,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r4-c2{background:rgba(10,22,82,.4);border-color:rgba(20,42,140,.3);--card-bg:rgba(14,30,106,.55);--card-border:rgba(26,52,160,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r4-c3{background:rgba(10,22,78,.4);border-color:rgba(20,40,135,.3);--card-bg:rgba(14,30,100,.55);--card-border:rgba(26,50,155,.4);--card-done-bg:rgba(30,60,25,.7);}
+body.dark .c-r4-c4{background:rgba(8,18,68,.4);border-color:rgba(16,34,118,.3);--card-bg:rgba(12,26,88,.55);--card-border:rgba(22,44,138,.4);--card-done-bg:rgba(30,60,25,.7);}
+
+/* task card */
+body.dark .task-card{
+  background:var(--card-bg,rgba(44,44,46,.9));
+  border-color:var(--card-border,rgba(255,255,255,.1));
+  color:rgba(255,255,255,.82);
+}
+body.dark .task-card:hover{filter:brightness(1.18);}
+body.dark .task-card.done{background:var(--card-done-bg,rgba(30,60,25,.7));border-color:rgba(48,140,48,.3);opacity:.75;}
+body.dark .task-card.done .task-text{color:rgba(100,185,100,.7);}
+body.dark .task-text{color:rgba(255,255,255,.82);}
+body.dark .task-check{border-color:rgba(255,255,255,.22);}
+body.dark .task-check:hover{border-color:rgba(255,255,255,.55);}
+body.dark .task-del{color:rgba(255,255,255,.2);}
+body.dark .task-del:hover{color:#ff453a!important;}
+body.dark .add-btn{border-color:rgba(255,255,255,.1);color:rgba(255,255,255,.2);}
+body.dark .add-btn:hover{border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.5);}
+body.dark .task-input{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.88);}
+body.dark .task-input::placeholder{color:rgba(255,255,255,.2);}
+body.dark .cell.drag-over{border-color:rgba(10,132,255,.8)!important;background:rgba(10,132,255,.08)!important;}
+body.dark .cell.has-tasks{border-style:solid!important;border-width:1px!important;}
+body.dark .row-hdr.row-drag-over{outline:2px solid rgba(10,132,255,.7);outline-offset:2px;}
+
+/* ══════════════════════════════════
+   LIGHT
+══════════════════════════════════ */
+body.light{
+  background:#f2f2f7;
+  color:rgba(0,0,0,.85);
+}
+
+body.light header{
+  background:rgba(255,255,255,.75);
+  border-bottom:1px solid rgba(0,0,0,.08);
+  backdrop-filter:saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+}
+body.light header h1{color:rgba(0,0,0,.8);}
+body.light .btn{background:rgba(0,0,0,.05);color:rgba(0,0,0,.55);}
+body.light .btn:hover{background:rgba(0,0,0,.09);color:rgba(0,0,0,.82);}
+body.light .btn.btn-subtle{background:rgba(0,0,0,.11);color:rgba(0,0,0,.7);}
+body.light .btn.btn-subtle:hover{background:rgba(0,0,0,.17);color:rgba(0,0,0,.9);}
+body.light #themeDot{background:#000000;}
+body.light .x-axis-bar span,body.light .y-axis-label{color:rgba(0,0,0,.3);}
+
+body.light footer{
+  background:rgba(255,255,255,.7);
+  border-top:1px solid rgba(0,0,0,.07);
+  backdrop-filter:blur(16px);
+}
+body.light .leg{color:rgba(0,0,0,.4);}
+body.light .hint{color:rgba(0,0,0,.25);}
+body.light .grid-scroll::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);}
+
+body.light .expand-col-btn,body.light .expand-row-btn{
+  background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.1);color:rgba(0,0,0,.25);
+}
+body.light .expand-col-btn:hover,body.light .expand-row-btn:hover{
+  background:rgba(0,0,0,.07);color:rgba(0,0,0,.55);border-color:rgba(0,0,0,.18);
+}
+body.light .del-axis{color:rgba(0,0,0,.2)!important;}
+body.light .del-axis:hover{color:#ff3b30!important;}
+body.light .col-hdr .del-axis,body.light .row-hdr .del-axis{color:rgba(255,255,255,.4)!important;}
+body.light .col-hdr .del-axis:hover,body.light .row-hdr .del-axis:hover{color:#ff3b30!important;}
+
+/* light cells */
+body.light .c-ext{background:rgba(142,142,147,.12);border-color:rgba(142,142,147,.25);}
+body.light .c-r0-c0{background:rgba(255,59,48,.1);border-color:rgba(255,59,48,.2);--card-bg:rgba(255,59,48,.14);--card-border:rgba(255,59,48,.3);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r0-c1{background:rgba(255,149,0,.1);border-color:rgba(255,149,0,.2);--card-bg:rgba(255,149,0,.14);--card-border:rgba(255,149,0,.3);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r0-c2{background:rgba(255,214,10,.1);border-color:rgba(255,214,10,.22);--card-bg:rgba(255,214,10,.16);--card-border:rgba(200,168,0,.3);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r0-c3{background:rgba(52,199,89,.1);border-color:rgba(52,199,89,.22);--card-bg:rgba(52,199,89,.15);--card-border:rgba(52,199,89,.3);--card-done-bg:rgba(52,199,89,.18);}
+body.light .c-r0-c4{background:rgba(0,122,255,.09);border-color:rgba(0,122,255,.2);--card-bg:rgba(0,122,255,.13);--card-border:rgba(0,122,255,.28);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r1-c0{background:rgba(255,149,0,.1);border-color:rgba(255,149,0,.2);--card-bg:rgba(255,149,0,.14);--card-border:rgba(255,149,0,.28);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r1-c1{background:rgba(255,159,10,.09);border-color:rgba(255,159,10,.2);--card-bg:rgba(255,159,10,.14);--card-border:rgba(255,159,10,.28);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r1-c2{background:rgba(255,204,0,.1);border-color:rgba(255,204,0,.22);--card-bg:rgba(255,204,0,.15);--card-border:rgba(200,160,0,.3);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r1-c3{background:rgba(52,199,89,.08);border-color:rgba(52,199,89,.18);--card-bg:rgba(52,199,89,.13);--card-border:rgba(52,199,89,.26);--card-done-bg:rgba(52,199,89,.15);}
+body.light .c-r1-c4{background:rgba(0,122,255,.08);border-color:rgba(0,122,255,.18);--card-bg:rgba(0,122,255,.12);--card-border:rgba(0,122,255,.25);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r2-c0{background:rgba(255,214,10,.1);border-color:rgba(255,214,10,.22);--card-bg:rgba(255,214,10,.15);--card-border:rgba(200,168,0,.3);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r2-c1{background:rgba(255,204,0,.1);border-color:rgba(255,204,0,.2);--card-bg:rgba(255,204,0,.15);--card-border:rgba(200,160,0,.28);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r2-c2{background:rgba(255,214,10,.08);border-color:rgba(200,168,0,.2);--card-bg:rgba(255,214,10,.13);--card-border:rgba(200,168,0,.28);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r2-c3{background:rgba(52,199,89,.07);border-color:rgba(52,199,89,.16);--card-bg:rgba(52,199,89,.12);--card-border:rgba(52,199,89,.24);--card-done-bg:rgba(52,199,89,.15);}
+body.light .c-r2-c4{background:rgba(0,122,255,.07);border-color:rgba(0,122,255,.16);--card-bg:rgba(0,122,255,.11);--card-border:rgba(0,122,255,.23);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r3-c0{background:rgba(52,199,89,.09);border-color:rgba(52,199,89,.2);--card-bg:rgba(52,199,89,.14);--card-border:rgba(52,199,89,.28);--card-done-bg:rgba(52,199,89,.16);}
+body.light .c-r3-c1{background:rgba(52,199,89,.08);border-color:rgba(52,199,89,.18);--card-bg:rgba(52,199,89,.13);--card-border:rgba(52,199,89,.25);--card-done-bg:rgba(52,199,89,.15);}
+body.light .c-r3-c2{background:rgba(52,199,89,.07);border-color:rgba(52,199,89,.16);--card-bg:rgba(52,199,89,.12);--card-border:rgba(52,199,89,.23);--card-done-bg:rgba(52,199,89,.15);}
+body.light .c-r3-c3{background:rgba(52,199,89,.07);border-color:rgba(52,199,89,.16);--card-bg:rgba(52,199,89,.12);--card-border:rgba(52,199,89,.23);--card-done-bg:rgba(52,199,89,.15);}
+body.light .c-r3-c4{background:rgba(0,122,255,.07);border-color:rgba(0,122,255,.15);--card-bg:rgba(0,122,255,.11);--card-border:rgba(0,122,255,.22);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r4-c0{background:rgba(0,122,255,.09);border-color:rgba(0,122,255,.2);--card-bg:rgba(0,122,255,.13);--card-border:rgba(0,122,255,.28);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r4-c1{background:rgba(0,122,255,.08);border-color:rgba(0,122,255,.18);--card-bg:rgba(0,122,255,.12);--card-border:rgba(0,122,255,.26);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r4-c2{background:rgba(0,122,255,.07);border-color:rgba(0,122,255,.16);--card-bg:rgba(0,122,255,.11);--card-border:rgba(0,122,255,.24);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r4-c3{background:rgba(0,122,255,.07);border-color:rgba(0,122,255,.15);--card-bg:rgba(0,122,255,.11);--card-border:rgba(0,122,255,.22);--card-done-bg:rgba(52,199,89,.1);}
+body.light .c-r4-c4{background:rgba(88,86,214,.07);border-color:rgba(88,86,214,.16);--card-bg:rgba(88,86,214,.11);--card-border:rgba(88,86,214,.24);--card-done-bg:rgba(52,199,89,.1);}
+
+body.light .task-card{
+  background:var(--card-bg,rgba(255,255,255,.9));
+  border-color:var(--card-border,rgba(0,0,0,.1));
+  color:rgba(0,0,0,.82);
+  box-shadow:0 1px 2px rgba(0,0,0,.04);
+}
+body.light .task-card:hover{filter:brightness(.97);box-shadow:0 2px 8px rgba(0,0,0,.08);}
+body.light .task-card.done{background:var(--card-done-bg,rgba(52,199,89,.1));border-color:rgba(52,199,89,.3);opacity:.8;}
+body.light .task-card.done .task-text{color:rgba(52,180,52,.75);}
+body.light .task-text{color:rgba(0,0,0,.82);}
+body.light .task-check{border-color:rgba(0,0,0,.2);}
+body.light .task-check:hover{border-color:rgba(0,122,255,.6);}
+body.light .task-del{color:rgba(0,0,0,.2);}
+body.light .task-del:hover{color:#ff3b30!important;}
+body.light .add-btn{border-color:rgba(0,0,0,.1);color:rgba(0,0,0,.22);}
+body.light .add-btn:hover{border-color:rgba(0,0,0,.22);color:rgba(0,0,0,.5);}
+body.light .task-input{background:rgba(255,255,255,.9);border-color:rgba(0,122,255,.5);color:rgba(0,0,0,.85);}
+body.light .task-input::placeholder{color:rgba(0,0,0,.22);}
+body.light .cell.drag-over{border-color:rgba(0,122,255,.7)!important;background:rgba(0,122,255,.06)!important;}
+body.light .cell.has-tasks{border-style:solid!important;border-width:1px!important;}
+body.light .row-hdr.row-drag-over{outline:2px solid rgba(0,122,255,.6);outline-offset:2px;}
+
+/* ══════════════════════════════════
+   SHARED STRUCTURAL
+══════════════════════════════════ */
+header{
+  padding:0 16px;height:44px;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+  position:sticky;top:0;z-index:100;
+}
+.header-left{display:flex;align-items:center;gap:9px;}
+header h1{font-size:13px;font-weight:600;letter-spacing:-.01em;}
+
+#themeDot{
+  width:10px;height:10px;border-radius:50%;border:none;
+  cursor:pointer;flex-shrink:0;padding:0;
+  transition:transform .15s,opacity .15s;
+}
+#themeDot:hover{transform:scale(1.3);opacity:.8;}
+
+.header-btns{display:flex;gap:6px;}
+.btn{
+  height:26px;padding:0 12px;border-radius:var(--radius-sm);
+  font-size:12px;font-weight:500;font-family:var(--font);
+  cursor:pointer;transition:background .12s;border:none;
+  display:flex;align-items:center;letter-spacing:-.01em;
+}
+.btn-accent{
+  height:26px;padding:0 12px;border-radius:var(--radius-sm);
+  font-size:12px;font-weight:500;font-family:var(--font);
+  cursor:pointer;background:#0a7aff;color:#fff;border:none;
+  transition:background .12s;display:flex;align-items:center;
+}
+.btn-accent:hover{background:#0066dd;}
+
+.layout{flex:1;display:flex;overflow:hidden;padding:10px 12px 0;}
+.y-axis-wrap{
+  display:flex;flex-direction:column;align-items:center;
+  width:28px;flex-shrink:0;padding-top:50px;
+}
+.y-axis-label{
+  writing-mode:vertical-lr;font-size:10px;letter-spacing:1.5px;
+  white-space:nowrap;font-weight:400;
+}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.x-axis-bar{
+  display:flex;align-items:center;height:28px;padding-left:2px;flex-shrink:0;
+}
+.x-axis-bar span{font-size:11px;letter-spacing:.5px;font-weight:400;}
+.grid-scroll{flex:1;overflow:auto;padding-bottom:12px;}
+.grid{display:grid;min-width:0;width:100%;gap:4px;}
+
+.corner{width:64px;height:40px;}
+
+/* col header */
+.col-hdr{
+  height:40px;border-radius:var(--radius-md);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:600;flex-shrink:0;position:relative;
+  letter-spacing:.01em;
+}
+.col-hdr .del-axis{
+  position:absolute;top:4px;right:5px;background:none;border:none;
+  cursor:pointer;font-size:12px;line-height:1;padding:0;transition:color .12s;
+}
+
+/* row header */
+.row-hdr{
+  width:64px;border-radius:var(--radius-md);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:600;position:relative;
+  user-select:none;cursor:grab;letter-spacing:.01em;
+}
+.row-hdr:active{cursor:grabbing;}
+.row-hdr.dragging-row{opacity:.35;}
+.row-hdr .del-axis{
+  position:absolute;bottom:3px;right:4px;background:none;border:none;
+  cursor:pointer;font-size:12px;line-height:1;padding:0;transition:color .12s;
+}
+.row-hdr .hdr-label{
+  flex:1;text-align:center;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;padding:0 4px;
+}
+.row-hdr input.hdr-edit{
+  width:calc(100% - 10px);background:rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.4);border-radius:4px;
+  color:inherit;font-size:11px;font-weight:600;font-family:var(--font);
+  text-align:center;outline:none;padding:2px 4px;
+}
+
+/* priority colors */
+.col-p0,.row-p0{background:#ff3b30;color:#fff;}
+.col-p1,.row-p1{background:#ff9500;color:#fff;}
+.col-p2,.row-p2{background:#ffcc00;color:rgba(0,0,0,.75);}
+.col-p3,.row-p3{background:#34c759;color:#fff;}
+.col-p4,.row-p4{background:#007aff;color:#fff;}
+.col-ext,.row-ext{background:rgba(142,142,147,.5);color:rgba(255,255,255,.7);font-style:italic;}
+
+/* cell */
+.cell{
+  border-radius:var(--radius-lg);padding:6px;
+  display:flex;flex-direction:column;gap:3px;
+  border:1px dashed transparent;
+  transition:border-color .15s,background .15s;
+  min-width:0;word-break:break-all;
+}
+.cell.has-tasks{border-style:solid!important;}
+
+/* task card */
+.task-card{
+  border-radius:var(--radius-sm);padding:5px 7px;
+  font-size:12px;line-height:1.45;letter-spacing:-.01em;
+  display:flex;align-items:flex-start;gap:5px;
+  cursor:grab;transition:filter .12s,opacity .15s,box-shadow .12s;
+  user-select:none;border:1px solid transparent;
+}
+.task-card.dragging{opacity:.3;cursor:grabbing;}
+.task-card.done .task-text{text-decoration:line-through;}
+
+.task-check{
+  width:14px;height:14px;border-radius:4px;border:1.5px solid rgba(142,142,147,.6);
+  cursor:pointer;flex-shrink:0;margin-top:1px;
+  display:flex;align-items:center;justify-content:center;transition:all .12s;
+}
+.task-check.checked{background:#34c759!important;border-color:#34c759!important;}
+.task-check.checked::after{content:'✓';font-size:9px;color:#fff;line-height:1;font-weight:700;}
+.task-text{flex:1;word-break:break-all;white-space:pre-wrap;}
+.task-del{
+  background:none;border:none;cursor:pointer;
+  font-size:13px;line-height:1;padding:0;flex-shrink:0;transition:color .12s;
+}
+
+.add-btn{
+  background:none;border-radius:var(--radius-sm);font-size:11px;
+  font-family:var(--font);padding:4px 0;cursor:pointer;
+  width:100%;transition:all .12s;flex-shrink:0;border:1px dashed rgba(142,142,147,.35);
+}
+
+.task-input{
+  border-radius:var(--radius-sm);font-size:12px;font-family:var(--font);
+  padding:5px 8px;width:100%;outline:none;flex-shrink:0;
+}
+
+.expand-col-btn,.expand-row-btn{
+  border-radius:var(--radius-md);cursor:pointer;font-size:14px;
+  transition:all .12s;display:flex;align-items:center;justify-content:center;
+  background:transparent;
+}
+.expand-col-btn{min-width:32px;height:40px;}
+.expand-row-btn{width:64px;min-height:56px;}
+
+footer{
+  padding:5px 16px 7px;display:flex;gap:12px;align-items:center;flex-shrink:0;
+}
+.legend{display:flex;gap:12px;}
+.leg{display:flex;align-items:center;gap:4px;font-size:11px;}
+.leg-dot{width:7px;height:7px;border-radius:50%;}
+.hint{margin-left:auto;font-size:11px;}
+
+.grid-scroll::-webkit-scrollbar{width:4px;height:4px;}
+.grid-scroll::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body class="dark">
+
+<header>
+  <div class="header-left">
+    <h1>⊞ 任务优先级矩阵</h1>
+    <button id="themeDot" title="切换主题"></button>
+  </div>
+  <div class="header-btns">
+    <button class="btn" id="clearDoneBtn">清除已完成</button>
+    <button class="btn btn-subtle" id="exportBtn">导出 JSON</button>
+    <button class="btn btn-subtle" id="importBtn">导入 JSON</button>
+    <input type="file" id="importFile" accept=".json" style="display:none"/>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="y-axis-wrap">
+    <div class="y-axis-label">任务优先级 高 → 低</div>
+  </div>
+  <div class="main">
+    <div class="x-axis-bar"><span>事项优先级：高 → 低</span></div>
+    <div class="grid-scroll">
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="legend">
+    <div class="leg"><div class="leg-dot" style="background:#ff3b30"></div>P1</div>
+    <div class="leg"><div class="leg-dot" style="background:#ff9500"></div>P2</div>
+    <div class="leg"><div class="leg-dot" style="background:#ffcc00"></div>P3</div>
+    <div class="leg"><div class="leg-dot" style="background:#34c759"></div>P4</div>
+    <div class="leg"><div class="leg-dot" style="background:#007aff"></div>P5</div>
+    <div class="leg"><div class="leg-dot" style="background:#8e8e93"></div>扩展</div>
+    <div class="leg"><div class="leg-dot" style="background:#34c759"></div>✓ 完成</div>
+  </div>
+  <div class="hint">拖拽行头换位 · 双击行头编辑 · 勾选完成 · 自动保存</div>
+</footer>
+
+<script>
+const STORAGE_KEY  = 'task-matrix-v6';
+const THEME_KEY    = 'task-matrix-theme';
+const ROW_NAME_KEY = 'task-matrix-rownames';
+const ROW_ORD_KEY  = 'task-matrix-roworder';
+const BASE = 5;
+const DEFAULT_NAMES = ['P1','P2','P3','P4','P5'];
+const COL_CLS = ['col-p0','col-p1','col-p2','col-p3','col-p4','col-ext'];
+const ROW_CLS = ['row-p0','row-p1','row-p2','row-p3','row-p4','row-ext'];
+
+let state    = loadState();
+let rowNames = loadRowNames();
+let rowOrder = loadRowOrder();
+
+function loadState(){
+  try{ const d=JSON.parse(localStorage.getItem(STORAGE_KEY)); if(d&&typeof d==='object') return d; }catch(e){}
+  return {extraCols:0,extraRows:0,cells:{}};
+}
+function loadRowNames(){
+  try{ const d=JSON.parse(localStorage.getItem(ROW_NAME_KEY)); if(Array.isArray(d)) return d; }catch(e){}
+  return [...DEFAULT_NAMES];
+}
+function loadRowOrder(){
+  try{ const d=JSON.parse(localStorage.getItem(ROW_ORD_KEY)); if(Array.isArray(d)) return d; }catch(e){}
+  return null;
+}
+function save(){ localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); }
+function saveRowNames(){ localStorage.setItem(ROW_NAME_KEY,JSON.stringify(rowNames)); }
+function saveRowOrder(){ localStorage.setItem(ROW_ORD_KEY,JSON.stringify(rowOrder)); }
+
+function totalCols(){ return BASE+state.extraCols; }
+function totalRows(){ return BASE+state.extraRows; }
+function logicalRow(r){ return rowOrder ? (rowOrder[r]!==undefined?rowOrder[r]:r) : r; }
+function cellKey(lr,c){ return `r${lr}-c${c}`; }
+function cellCls(r,c){ return (r>=BASE||c>=BASE)?'c-ext':`c-r${r}-c${c}`; }
+function colCls(c){ return c<BASE?COL_CLS[c]:'col-ext'; }
+function rowCls(r){ return r<BASE?ROW_CLS[r]:'row-ext'; }
+function colLabel(c){ return c<BASE?DEFAULT_NAMES[c]:`扩展${c-BASE+1}`; }
+function rowName(r){
+  const lr=logicalRow(r);
+  return rowNames[lr]!==undefined?rowNames[lr]:(lr<BASE?DEFAULT_NAMES[lr]:`扩展${lr-BASE+1}`);
+}
+function ensureRowOrder(){
+  const rows=totalRows();
+  if(!rowOrder) rowOrder=Array.from({length:rows},(_,i)=>i);
+  else while(rowOrder.length<rows) rowOrder.push(rowOrder.length);
+}
+
+function buildGrid(){
+  ensureRowOrder();
+  const grid=document.getElementById('grid');
+  const cols=totalCols(), rows=totalRows();
+  grid.style.gridTemplateColumns=`64px repeat(${cols},1fr) 32px`;
+  grid.innerHTML='';
+
+  grid.appendChild(mkEl('div','corner'));
+  for(let c=0;c<cols;c++){
+    const h=mkEl('div','col-hdr '+colCls(c));
+    h.appendChild(mkEl('span','',colLabel(c)));
+    if(c>=BASE){
+      const d=mkEl('button','del-axis','×');
+      d.title='删除此扩展列';
+      d.addEventListener('click',e=>{ e.stopPropagation(); deleteExtCol(c); });
+      h.appendChild(d);
+    }
+    grid.appendChild(h);
+  }
+  const addColBtn=mkEl('button','expand-col-btn','＋');
+  addColBtn.title='添加扩展列';
+  addColBtn.addEventListener('click',()=>{ state.extraCols++; save(); buildGrid(); });
+  grid.appendChild(addColBtn);
+
+  for(let r=0;r<rows;r++){
+    const lr=logicalRow(r);
+    const rh=mkEl('div','row-hdr '+rowCls(r));
+    rh.dataset.visualRow=r;
+    const lbl=mkEl('span','hdr-label',rowName(r));
+    rh.appendChild(lbl);
+    if(lr>=BASE){
+      const d=mkEl('button','del-axis','×');
+      d.title='删除此扩展行';
+      d.addEventListener('click',e=>{ e.stopPropagation(); deleteExtRow(r); });
+      rh.appendChild(d);
+    }
+    rh.addEventListener('dblclick',()=>startEditRowName(rh,lbl,r));
+    setupRowDrag(rh,r);
+    grid.appendChild(rh);
+
+    for(let c=0;c<cols;c++){
+      const key=cellKey(lr,c);
+      const cell=mkEl('div','cell '+cellCls(r,c));
+      cell.dataset.key=key; cell.dataset.visualRow=r; cell.dataset.col=c;
+      renderCellContent(cell,key);
+      setupDrop(cell);
+      grid.appendChild(cell);
+    }
+    grid.appendChild(mkEl('div',''));
+  }
+
+  const addRowBtn=mkEl('button','expand-row-btn','＋');
+  addRowBtn.title='添加扩展行';
+  addRowBtn.style.gridColumn='1';
+  addRowBtn.addEventListener('click',()=>{
+    const nl=totalRows();
+    state.extraRows++;
+    ensureRowOrder();
+    rowNames[nl]=`扩展${state.extraRows}`;
+    saveRowNames(); saveRowOrder(); save(); buildGrid();
+  });
+  grid.appendChild(addRowBtn);
+}
+
+function mkEl(tag,cls,text){
+  const e=document.createElement(tag);
+  if(cls) e.className=cls;
+  if(text!==undefined) e.textContent=text;
+  return e;
+}
+
+let dragFromRow=null;
+function setupRowDrag(rh,r){
+  rh.draggable=true;
+  rh.addEventListener('dragstart',e=>{
+    dragFromRow=r; rh.classList.add('dragging-row');
+    e.dataTransfer.setData('row-drag',String(r));
+    e.dataTransfer.effectAllowed='move';
+  });
+  rh.addEventListener('dragend',()=>{
+    rh.classList.remove('dragging-row'); dragFromRow=null;
+    document.querySelectorAll('.row-drag-over').forEach(el=>el.classList.remove('row-drag-over'));
+  });
+  rh.addEventListener('dragover',e=>{
+    if(dragFromRow===null||dragFromRow===r) return;
+    e.preventDefault(); e.dataTransfer.dropEffect='move';
+    document.querySelectorAll('.row-drag-over').forEach(el=>el.classList.remove('row-drag-over'));
+    rh.classList.add('row-drag-over');
+  });
+  rh.addEventListener('dragleave',()=>rh.classList.remove('row-drag-over'));
+  rh.addEventListener('drop',e=>{
+    e.preventDefault(); rh.classList.remove('row-drag-over');
+    const from=dragFromRow, to=r;
+    if(from===null||from===to) return;
+    ensureRowOrder();
+    const tmp=rowOrder[from]; rowOrder[from]=rowOrder[to]; rowOrder[to]=tmp;
+    saveRowOrder(); buildGrid();
+  });
+}
+
+function startEditRowName(rh,lbl,visualRow){
+  if(rh.querySelector('.hdr-edit')) return;
+  const lr=logicalRow(visualRow);
+  const inp=document.createElement('input');
+  inp.className='hdr-edit'; inp.value=rowName(visualRow); inp.maxLength=12;
+  lbl.style.display='none'; rh.insertBefore(inp,lbl);
+  inp.focus(); inp.select();
+  function commit(){
+    const v=inp.value.trim()||rowName(visualRow);
+    rowNames[lr]=v; saveRowNames();
+    lbl.textContent=v; lbl.style.display=''; inp.remove();
+  }
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();commit();} else if(e.key==='Escape'){lbl.style.display='';inp.remove();} });
+  inp.addEventListener('blur',commit);
+}
+
+function deleteExtCol(ci){
+  if(!confirm(`删除扩展列"${colLabel(ci)}"及其所有任务？`)) return;
+  const rows=totalRows();
+  for(let r=0;r<rows;r++) delete state.cells[cellKey(logicalRow(r),ci)];
+  for(let c=ci+1;c<totalCols();c++)
+    for(let r=0;r<rows;r++){
+      const lr=logicalRow(r);
+      state.cells[cellKey(lr,c-1)]=state.cells[cellKey(lr,c)]||[];
+      delete state.cells[cellKey(lr,c)];
+    }
+  state.extraCols--; save(); buildGrid();
+}
+function deleteExtRow(vr){
+  const lr=logicalRow(vr);
+  if(!confirm(`删除行"${rowName(vr)}"及其所有任务？`)) return;
+  for(let c=0;c<totalCols();c++) delete state.cells[cellKey(lr,c)];
+  ensureRowOrder();
+  rowOrder.splice(vr,1);
+  rowOrder=rowOrder.map(v=>v>lr?v-1:v);
+  rowNames.splice(lr,1);
+  state.extraRows--;
+  save(); saveRowNames(); saveRowOrder(); buildGrid();
+}
+
+function renderCellContent(cell,key){
+  cell.innerHTML='';
+  const tasks=state.cells[key]||[];
+  cell.classList.toggle('has-tasks',tasks.length>0);
+  tasks.forEach((_,idx)=>cell.appendChild(makeCard(key,idx)));
+  const ab=mkEl('button','add-btn','＋ 添加任务');
+  ab.addEventListener('click',()=>showInput(cell,key));
+  cell.appendChild(ab);
+}
+function makeCard(key,idx){
+  const t=(state.cells[key]||[])[idx]; if(!t) return mkEl('div');
+  const card=mkEl('div','task-card'+(t.done?' done':''));
+  card.draggable=true; card.dataset.key=key; card.dataset.idx=idx;
+  const chk=mkEl('div','task-check'+(t.done?' checked':''));
+  chk.title=t.done?'取消完成':'标记完成';
+  chk.addEventListener('click',e=>{ e.stopPropagation(); state.cells[key][idx].done=!state.cells[key][idx].done; save(); refreshCell(key); });
+  const txt=mkEl('span','task-text'); txt.textContent=t.text;
+  const del=mkEl('button','task-del','×'); del.title='删除';
+  del.addEventListener('click',e=>{ e.stopPropagation(); state.cells[key].splice(idx,1); save(); refreshCell(key); });
+  card.appendChild(chk); card.appendChild(txt); card.appendChild(del);
+  card.addEventListener('dragstart',e=>{ card.classList.add('dragging'); e.dataTransfer.setData('text/plain',JSON.stringify({fromKey:key,idx})); e.dataTransfer.effectAllowed='move'; });
+  card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+  return card;
+}
+function refreshCell(key){
+  const cell=document.querySelector(`.cell[data-key="${key}"]`);
+  if(cell) renderCellContent(cell,key);
+}
+function setupDrop(cell){
+  cell.addEventListener('dragover',e=>{ if(dragFromRow!==null) return; e.preventDefault(); e.dataTransfer.dropEffect='move'; cell.classList.add('drag-over'); });
+  cell.addEventListener('dragleave',()=>cell.classList.remove('drag-over'));
+  cell.addEventListener('drop',e=>{
+    cell.classList.remove('drag-over');
+    if(dragFromRow!==null) return;
+    e.preventDefault();
+    try{
+      const {fromKey,idx}=JSON.parse(e.dataTransfer.getData('text/plain'));
+      const toKey=cell.dataset.key;
+      if(!fromKey||!toKey||fromKey===toKey) return;
+      const task=(state.cells[fromKey]||[])[idx]; if(!task) return;
+      state.cells[fromKey].splice(idx,1);
+      if(!state.cells[toKey]) state.cells[toKey]=[];
+      state.cells[toKey].push({...task});
+      save(); refreshCell(fromKey); refreshCell(toKey);
+    }catch(e2){}
+  });
+}
+function showInput(cell,key){
+  if(cell.querySelector('.task-input')) return;
+  const ab=cell.querySelector('.add-btn'); ab.style.display='none';
+  const inp=mkEl('input','task-input');
+  inp.placeholder='输入任务，回车确认，Esc取消'; inp.maxLength=80;
+  cell.insertBefore(inp,ab); inp.focus();
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){ const text=inp.value.trim(); if(text){ if(!state.cells[key]) state.cells[key]=[]; state.cells[key].push({text,done:false}); save(); } renderCellContent(cell,key); }
+    else if(e.key==='Escape') renderCellContent(cell,key);
+  });
+  inp.addEventListener('blur',()=>{ setTimeout(()=>{ if(cell.querySelector('.task-input')) renderCellContent(cell,key); },150); });
+}
+
+document.getElementById('clearDoneBtn').addEventListener('click',()=>{
+  if(!confirm('删除所有已完成的任务？')) return;
+  Object.keys(state.cells).forEach(k=>{ state.cells[k]=(state.cells[k]||[]).filter(t=>!t.done); });
+  save(); buildGrid();
+});
+document.getElementById('exportBtn').addEventListener('click',()=>{
+  const blob=new Blob([JSON.stringify({state,rowNames,rowOrder},null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='task-matrix.json'; a.click();
+});
+
+document.getElementById('importBtn').addEventListener('click',()=>{
+  document.getElementById('importFile').click();
+});
+document.getElementById('importFile').addEventListener('change', e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    try{
+      const d = JSON.parse(ev.target.result);
+      if(!d || typeof d !== 'object') throw new Error('格式错误');
+      if(!confirm('导入将覆盖当前所有数据，确认继续？')) return;
+      if(d.state)    { state = d.state;       localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+      if(d.rowNames) { rowNames = d.rowNames; localStorage.setItem(ROW_NAME_KEY, JSON.stringify(rowNames)); }
+      if(d.rowOrder) { rowOrder = d.rowOrder; localStorage.setItem(ROW_ORD_KEY, JSON.stringify(rowOrder)); }
+      else           { rowOrder = null;       localStorage.removeItem(ROW_ORD_KEY); }
+      buildGrid();
+    }catch(err){
+      alert('导入失败：文件格式不正确\n'+err.message);
+    }
+    e.target.value=''; // reset so same file can be re-imported
+  };
+  reader.readAsText(file);
+});
+
+function applyTheme(t){
+  document.body.classList.remove('dark','light');
+  document.body.classList.add(t);
+  localStorage.setItem(THEME_KEY,t);
+}
+applyTheme(localStorage.getItem(THEME_KEY)||'dark');
+document.getElementById('themeDot').addEventListener('click',()=>{
+  applyTheme(document.body.classList.contains('dark')?'light':'dark');
+});
+
+buildGrid();
+</script>
+</body>
+</html>
