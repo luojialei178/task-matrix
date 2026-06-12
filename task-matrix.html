@@ -350,6 +350,7 @@ header h1{font-size:13px;font-weight:600;letter-spacing:-.01em;}
 .task-input{
   border-radius:var(--radius-sm);font-size:12px;font-family:var(--font);
   padding:5px 8px;width:100%;outline:none;flex-shrink:0;
+  box-sizing:border-box;display:block;
 }
 
 .expand-col-btn,.expand-row-btn{
@@ -707,10 +708,10 @@ function makeCard(key,idx){
     if(card.querySelector('.card-edit-input')) return;
     card.draggable=false;
     txt.style.display='none';
-    const inp=document.createElement('input');
+    const inp=document.createElement('textarea');
     inp.className='task-input card-edit-input';
-    inp.value=t.text; inp.maxLength=80;
-    inp.style.cssText='flex:1;margin:0;padding:2px 5px;font-size:12px;';
+    inp.value=t.text;
+    inp.rows=2; inp.style.cssText='flex:1;margin:0;padding:2px 5px;font-size:12px;resize:none;line-height:1.45;';
     card.insertBefore(inp, del);
     inp.focus(); inp.select();
     function commitEdit(){
@@ -719,6 +720,8 @@ function makeCard(key,idx){
       refreshCell(key);
     }
     inp.addEventListener('keydown',e2=>{
+      const isNewline=(e2.key==='Enter')&&(e2.shiftKey||e2.altKey);
+      if(isNewline){ e2.preventDefault(); const s=inp.selectionStart,v=inp.value; inp.value=v.slice(0,s)+'\n'+v.slice(inp.selectionEnd); inp.selectionStart=inp.selectionEnd=s+1; return; }
       if(e2.key==='Enter'){ e2.preventDefault(); commitEdit(); }
       else if(e2.key==='Escape'){ refreshCell(key); }
     });
@@ -754,11 +757,14 @@ function setupDrop(cell){
 function showInput(cell,key){
   if(cell.querySelector('.task-input')) return;
   const ab=cell.querySelector('.add-btn'); ab.style.display='none';
-  const inp=mkEl('input','task-input');
-  inp.placeholder='输入任务，回车确认，Esc取消'; inp.maxLength=80;
+  const inp=mkEl('textarea','task-input');
+  inp.placeholder='输入任务，回车确认\nShift/Alt+Enter 换行，Esc取消';
+  inp.rows=2; inp.style.cssText='resize:none;line-height:1.45;';
   cell.insertBefore(inp,ab); inp.focus();
   inp.addEventListener('keydown',e=>{
-    if(e.key==='Enter'){ const text=inp.value.trim(); if(text){ if(!state.cells[key]) state.cells[key]=[]; state.cells[key].push({text,done:false}); save(); ensureFileHandle(); } renderCellContent(cell,key); }
+    const isNewline=(e.key==='Enter')&&(e.shiftKey||e.altKey);
+    if(isNewline){ e.preventDefault(); const s=inp.selectionStart,v=inp.value; inp.value=v.slice(0,s)+'\n'+v.slice(inp.selectionEnd); inp.selectionStart=inp.selectionEnd=s+1; return; }
+    if(e.key==='Enter'){ e.preventDefault(); const text=inp.value.trim(); if(text){ if(!state.cells[key]) state.cells[key]=[]; state.cells[key].push({text,done:false}); save(); ensureFileHandle(); } renderCellContent(cell,key); }
     else if(e.key==='Escape') renderCellContent(cell,key);
   });
   inp.addEventListener('blur',()=>{ setTimeout(()=>{ if(cell.querySelector('.task-input')) renderCellContent(cell,key); },150); });
