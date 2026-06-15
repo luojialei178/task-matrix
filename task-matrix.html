@@ -764,7 +764,7 @@ function showInput(cell,key){
   inp.addEventListener('keydown',e=>{
     const isNewline=(e.key==='Enter')&&(e.shiftKey||e.altKey);
     if(isNewline){ e.preventDefault(); const s=inp.selectionStart,v=inp.value; inp.value=v.slice(0,s)+'\n'+v.slice(inp.selectionEnd); inp.selectionStart=inp.selectionEnd=s+1; return; }
-    if(e.key==='Enter'){ e.preventDefault(); const text=inp.value.trim(); if(text){ if(!state.cells[key]) state.cells[key]=[]; state.cells[key].push({text,done:false}); save(); } renderCellContent(cell,key); }
+    if(e.key==='Enter'){ e.preventDefault(); const text=inp.value.trim(); if(text){ const isFirst=Object.values(state.cells).every(a=>!a||a.length===0); if(!state.cells[key]) state.cells[key]=[]; state.cells[key].push({text,done:false}); save(); if(isFirst) ensureFileHandle(); } renderCellContent(cell,key); }
     else if(e.key==='Escape') renderCellContent(cell,key);
   });
   inp.addEventListener('blur',()=>{ setTimeout(()=>{ if(cell.querySelector('.task-input')) renderCellContent(cell,key); },150); });
