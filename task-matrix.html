@@ -767,7 +767,7 @@ function showInput(cell,key){
     if(e.key==='Enter'){ e.preventDefault(); const text=inp.value.trim(); if(text){ const isFirst=Object.values(state.cells).every(a=>!a||a.length===0); if(!state.cells[key]) state.cells[key]=[]; state.cells[key].push({text,done:false}); save(); if(isFirst) ensureFileHandle(); } renderCellContent(cell,key); }
     else if(e.key==='Escape') renderCellContent(cell,key);
   });
-  inp.addEventListener('blur',()=>{ setTimeout(()=>{ if(cell.querySelector('.task-input')) renderCellContent(cell,key); },150); });
+  inp.addEventListener('blur',()=>{ setTimeout(()=>{ if(!cell.querySelector('.task-input')) return; const text=inp.value.trim(); if(text){ const isFirst=Object.values(state.cells).every(a=>!a||a.length===0); if(!state.cells[key]) state.cells[key]=[]; state.cells[key].push({text,done:false}); save(); if(isFirst) ensureFileHandle(); } renderCellContent(cell,key); },150); });
 }
 
 document.getElementById('clearDoneBtn').addEventListener('click',()=>{
