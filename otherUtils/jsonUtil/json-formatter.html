@@ -19,6 +19,8 @@ body{
   flex-direction:column;
   -webkit-font-smoothing:antialiased;
   transition:background .25s,color .25s;
+  background:#1c1c1e;
+  color:rgba(255,255,255,.85);
 }
 
 /* ══════════════════════════════════
@@ -527,16 +529,74 @@ function setupInputOutputSync(){
   inputEl.addEventListener('input', syncHighlight);
   
   function syncHighlight(){
-    const cursorPos = inputEl.selectionStart;
-    const inputText = inputEl.textContent;
-    
     // 清除括号高亮（互斥）
     outputEl.querySelectorAll('.bracket-match').forEach(el=>el.classList.remove('bracket-match'));
     
     // 清除之前的数据高亮
     outputEl.querySelectorAll('.data-highlight').forEach(el=>el.classList.remove('data-highlight'));
     
+    const inputText = inputEl.textContent;
     if(!inputText.trim()) return;
+    
+    // 获取光标位置（contenteditable 需要用 Selection API）
+    const selection = window.getSelection();
+    if(!selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(inputEl);
+    preCaretRange.setEnd(range.endContainer, range.endOffset);
+    const cursorPos = preCaretRange.toString().length;
+    
+    // 判断输入框是否是转义格式
+    let workingText = inputText;
+    let isEscaped = false;
+    let adjustedCursorPos = cursorPos;
+    
+    if(inputText.startsWith('"') && inputText.endsWith('"') && inputText.includes('\\"')){
+      // 尝试解析转义字符串
+      try{
+        const unescaped = JSON.parse(inputText);
+        if(typeof unescaped === 'string'){
+          workingText = unescaped;
+          isEscaped = true;
+          
+          // 计算在转义字符串中的实际位置
+          // 需要从 inputText 映射到 unescaped
+          let escapedPos = 0; // 转义字符串中的位置（不含首尾引号）
+          let unescapedPos = 0; // 解析后字符串中的位置
+          
+          // 跳过开头的引号
+          if(cursorPos <= 1){
+            adjustedCursorPos = 0;
+          }else if(cursorPos >= inputText.length - 1){
+            adjustedCursorPos = unescaped.length;
+          }else{
+            // 逐字符映射位置
+            escapedPos = 1; // 从第一个引号后开始
+            while(escapedPos < cursorPos && unescapedPos < unescaped.length){
+              if(inputText[escapedPos] === '\\' && escapedPos + 1 < inputText.length){
+                const nextChar = inputText[escapedPos + 1];
+                if(nextChar === '"' || nextChar === '\\' || nextChar === 'n' || nextChar === 't' || nextChar === 'r'){
+                  // 转义序列，占2个字符
+                  escapedPos += 2;
+                  unescapedPos += 1;
+                }else{
+                  escapedPos += 1;
+                  unescapedPos += 1;
+                }
+              }else{
+                escapedPos += 1;
+                unescapedPos += 1;
+              }
+            }
+            adjustedCursorPos = unescapedPos;
+          }
+        }
+      }catch(e){
+        // 解析失败，使用原文本
+      }
+    }
     
     let targetText = null;
     let isKey = false;
@@ -546,20 +606,20 @@ function setupInputOutputSync(){
     let stringStart = -1;
     let stringEnd = -1;
     
-    for(let i = 0; i < inputText.length; i++){
-      if(inputText[i] === '"' && (i === 0 || inputText[i-1] !== '\\')){
+    for(let i = 0; i < workingText.length; i++){
+      if(workingText[i] === '"' && (i === 0 || workingText[i-1] !== '\\')){
         if(!inString){
           stringStart = i;
           inString = true;
         }else{
           stringEnd = i;
-          if(cursorPos >= stringStart && cursorPos <= stringEnd + 1){
+          if(adjustedCursorPos >= stringStart && adjustedCursorPos <= stringEnd + 1){
             // 光标在这个字符串内
-            targetText = inputText.substring(stringStart, stringEnd + 1);
+            targetText = workingText.substring(stringStart, stringEnd + 1);
             // 检查是否是 key（后面跟冒号）
             let j = stringEnd + 1;
-            while(j < inputText.length && /\s/.test(inputText[j])) j++;
-            if(inputText[j] === ':'){
+            while(j < workingText.length && /\s/.test(workingText[j])) j++;
+            if(workingText[j] === ':'){
               isKey = true;
             }
             break;
@@ -572,18 +632,18 @@ function setupInputOutputSync(){
     // 策略2: 如果不在字符串内，检查数字、布尔、null
     if(!targetText){
       // 向前查找 token 边界
-      let start = cursorPos;
-      while(start > 0 && /[\w.\-]/.test(inputText[start - 1])){
+      let start = adjustedCursorPos;
+      while(start > 0 && /[\w.\-]/.test(workingText[start - 1])){
         start--;
       }
       
       // 向后查找 token 边界
-      let end = cursorPos;
-      while(end < inputText.length && /[\w.\-]/.test(inputText[end])){
+      let end = adjustedCursorPos;
+      while(end < workingText.length && /[\w.\-]/.test(workingText[end])){
         end++;
       }
       
-      targetText = inputText.substring(start, end);
+      targetText = workingText.substring(start, end);
     }
     
     if(targetText && targetText !== ''){
@@ -708,13 +768,55 @@ function reverseFormat(){
     setStatus(outputStatus, '输出为空', 'error');
     return;
   }
+  
+  // 获取输入框原始内容（用于判断格式）
+  const inputText = inputEl.textContent.trim();
+  
+  if(!inputText){
+    setStatus(inputStatus, '输入框为空，无法判断原始格式', 'error');
+    return;
+  }
+  
   try{
-    // 解析输出区的 JSON
-    const obj = JSON.parse(outputText);
-    // 压缩后输出回输入框（恢复原格式）
-    const compressed = JSON.stringify(obj);
-    inputEl.textContent = compressed;
-    setStatus(inputStatus, '已反向输出（压缩格式）', 'success');
+    // 先尝试解析输出区（可能是转义字符串或普通JSON）
+    let outputObj;
+    
+    // 尝试解析输出框
+    const firstParse = JSON.parse(outputText);
+    
+    // 检查是否是转义字符串（解析后是string类型）
+    if(typeof firstParse === 'string'){
+      // 输出框是转义格式，需要再解析一次
+      outputObj = JSON.parse(firstParse);
+    }else{
+      // 输出框是普通JSON
+      outputObj = firstParse;
+    }
+    
+    let result;
+    
+    // 通过文本特征直接判断输入框原格式（不依赖解析）
+    // 1. 检查是否是转义格式（以 " 开头并且包含 \" 转义）
+    if(inputText.startsWith('"') && inputText.endsWith('"') && inputText.includes('\\"')){
+      // 输入框原本是转义格式
+      const jsonStr = JSON.stringify(outputObj);
+      result = JSON.stringify(jsonStr);
+      setStatus(inputStatus, '已同步数据（保持转义格式）', 'success');
+    }
+    // 2. 检查是否是格式化格式（包含换行 + 缩进）
+    else if(inputText.includes('\n') && inputText.match(/\n\s{2,}/)){
+      // 输入框原本是格式化 JSON
+      result = JSON.stringify(outputObj, null, 2);
+      setStatus(inputStatus, '已同步数据（保持格式化）', 'success');
+    }
+    // 3. 否则是压缩格式
+    else{
+      // 输入框原本是压缩 JSON
+      result = JSON.stringify(outputObj);
+      setStatus(inputStatus, '已同步数据（保持压缩格式）', 'success');
+    }
+    
+    inputEl.textContent = result;
   }catch(e){
     const errorMsg = e.message.replace(/\s+at position \d+/i, '').replace(/\s+in JSON at position \d+/i, '');
     setStatus(outputStatus, '输出区 JSON 无效: ' + errorMsg, 'error');
@@ -753,7 +855,13 @@ function compressJSON(){
     setOutput(compressed, false);
     setStatus(outputStatus, '压缩成功', 'success');
   }catch(e){
-    setStatus(inputStatus, '解析失败: ' + e.message, 'error');
+    const errorMsg = e.message.replace(/\s+at position \d+/i, '').replace(/\s+in JSON at position \d+/i, '');
+    setStatus(inputStatus, errorMsg, 'error');
+    
+    // 容错压缩：移除所有空白
+    const compressed = input.replace(/\s+/g, ' ').replace(/\s*([{}[\]:,])\s*/g, '$1');
+    outputEl.textContent = compressed;
+    setStatus(outputStatus, '已尝试压缩（可能有错误）', 'error');
   }
 }
 
@@ -771,7 +879,13 @@ function escapeJSON(){
     setOutput(escaped, false);
     setStatus(outputStatus, '转义成功（双引号已转义）', 'success');
   }catch(e){
-    setStatus(inputStatus, '解析失败: ' + e.message, 'error');
+    const errorMsg = e.message.replace(/\s+at position \d+/i, '').replace(/\s+in JSON at position \d+/i, '');
+    setStatus(inputStatus, errorMsg, 'error');
+    
+    // 容错转义：直接对字符串转义
+    const escaped = JSON.stringify(input);
+    outputEl.textContent = escaped;
+    setStatus(outputStatus, '已尝试转义（输入可能有错误）', 'error');
   }
 }
 
@@ -795,7 +909,71 @@ function unescapeJSON(){
       setStatus(outputStatus, '已格式化（输入未转义）', 'success');
     }
   }catch(e){
-    setStatus(inputStatus, '解析失败: ' + e.message, 'error');
+    // 容错处理：尝试部分反转义
+    const errorMsg = e.message.replace(/\s+at position \d+/i, '').replace(/\s+in JSON at position \d+/i, '');
+    
+    try{
+      // 尝试先解析一层（可能是转义字符串）
+      const firstParse = JSON.parse(input);
+      if(typeof firstParse === 'string'){
+        // 第一层解析成功，是转义字符串，但第二层失败
+        // 尝试容错格式化第二层
+        const errorMatch = e.message.match(/position (\d+)/);
+        const errorPos = errorMatch ? parseInt(errorMatch[1]) : -1;
+        
+        let formatted = '';
+        let indent = 0;
+        let inString = false;
+        let errorMarked = false;
+        
+        for(let i = 0; i < firstParse.length; i++){
+          const ch = firstParse[i];
+          const isErrorPos = (errorPos !== -1 && i >= errorPos && i < errorPos + 10 && !errorMarked);
+          
+          if(ch === '"' && (i === 0 || firstParse[i-1] !== '\\')){
+            inString = !inString;
+          }
+          
+          if(isErrorPos){
+            formatted += '<span class="json-error" title="错误位置">';
+            errorMarked = true;
+          }
+          
+          if(!inString){
+            if(ch === '{' || ch === '['){
+              formatted += ch + '\n' + '  '.repeat(++indent);
+            }else if(ch === '}' || ch === ']'){
+              formatted += '\n' + '  '.repeat(--indent) + ch;
+            }else if(ch === ','){
+              formatted += ch + '\n' + '  '.repeat(indent);
+            }else if(ch === ':'){
+              formatted += ': ';
+            }else if(!/\s/.test(ch)){
+              formatted += ch;
+            }
+          }else{
+            formatted += ch;
+          }
+          
+          if(errorMarked && i >= errorPos + 9){
+            formatted += '</span>';
+            errorMarked = false;
+          }
+        }
+        
+        if(errorMarked){
+          formatted += '</span>';
+        }
+        
+        outputEl.innerHTML = formatted;
+        setStatus(outputStatus, errorMsg + ' (已尝试部分格式化)', 'error');
+        return;
+      }
+    }catch(innerE){
+      // 完全失败
+    }
+    
+    setStatus(inputStatus, '解析失败: ' + errorMsg, 'error');
   }
 }
 
