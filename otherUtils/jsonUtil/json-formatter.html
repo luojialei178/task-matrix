@@ -58,6 +58,20 @@ body.dark textarea{
 }
 body.dark textarea::placeholder{color:rgba(255,255,255,.3);}
 body.dark textarea:focus{border-color:rgba(10,122,255,.6);}
+body.dark .code-display{
+  background:rgba(0,0,0,.3);
+  border-color:rgba(255,255,255,.1);
+  color:rgba(255,255,255,.9);
+}
+body.dark .json-key{color:#d4a76a;}
+body.dark .json-string{color:#a5d6a7;}
+body.dark .json-number{color:#9ab4f5;}
+body.dark .json-boolean{color:#ce93d8;}
+body.dark .json-null{color:#ef9a9a;}
+body.dark .json-bracket{color:rgba(255,255,255,.6);cursor:pointer;transition:background .15s;}
+body.dark .json-bracket:hover{background:rgba(255,255,255,.08);border-radius:2px;}
+body.dark .bracket-match{background:rgba(10,132,255,.25)!important;border-radius:2px;animation:bracketFlash .4s ease;}
+body.dark .data-highlight{background:rgba(255,193,7,.25)!important;border-radius:2px;animation:dataFlash .4s ease;}
 body.dark .status.error{color:#ff453a;}
 body.dark .status.success{color:#34c759;}
 
@@ -87,17 +101,32 @@ body.light .btn-primary:hover{
 }
 body.light #themeDot{background:#000000;}
 body.light .panel{
-  background:rgba(255,255,255,.7);
-  border:1px solid rgba(0,0,0,.08);
+  background:rgba(255,255,255,.8);
+  border:1px solid rgba(0,0,0,.12);
+  box-shadow:0 1px 3px rgba(0,0,0,.04);
 }
 body.light .panel-title{color:rgba(0,0,0,.5);}
 body.light textarea{
-  background:rgba(255,255,255,.9);
-  border-color:rgba(0,0,0,.1);
+  background:rgba(255,255,255,.95);
+  border-color:rgba(0,0,0,.15);
   color:rgba(0,0,0,.85);
 }
 body.light textarea::placeholder{color:rgba(0,0,0,.3);}
 body.light textarea:focus{border-color:rgba(10,122,255,.5);}
+body.light .code-display{
+  background:rgba(255,255,255,.95);
+  border-color:rgba(0,0,0,.15);
+  color:rgba(0,0,0,.85);
+}
+body.light .json-key{color:#b8860b;}
+body.light .json-string{color:#2e7d32;}
+body.light .json-number{color:#1565c0;}
+body.light .json-boolean{color:#7b1fa2;}
+body.light .json-null{color:#c62828;}
+body.light .json-bracket{color:rgba(0,0,0,.5);cursor:pointer;transition:background .15s;}
+body.light .json-bracket:hover{background:rgba(0,0,0,.05);border-radius:2px;}
+body.light .bracket-match{background:rgba(10,122,255,.2)!important;border-radius:2px;animation:bracketFlash .4s ease;}
+body.light .data-highlight{background:rgba(255,193,7,.3)!important;border-radius:2px;animation:dataFlash .4s ease;}
 body.light .status.error{color:#ff3b30;}
 body.light .status.success{color:#34c759;}
 
@@ -197,6 +226,35 @@ textarea{
   outline:none;
   min-height:400px;
   transition:border-color .15s;
+  border:1px solid;
+}
+.code-display{
+  flex:1;
+  border-radius:var(--radius-sm);
+  padding:12px;
+  font-family:'SF Mono',Monaco,Consolas,monospace;
+  font-size:13px;
+  line-height:1.6;
+  overflow:auto;
+  min-height:400px;
+  border:1px solid;
+  white-space:pre;
+  word-wrap:break-word;
+  tab-size:2;
+}
+.json-key{font-weight:600;}
+.json-string{}
+.json-number{}
+.json-boolean{}
+.json-null{font-weight:600;}
+.json-bracket{padding:0 2px;user-select:none;}
+@keyframes bracketFlash{
+  0%,100%{opacity:1;}
+  50%{opacity:.5;}
+}
+@keyframes dataFlash{
+  0%,100%{opacity:1;}
+  50%{opacity:.5;}
 }
 .status{
   margin-top:8px;
@@ -245,7 +303,7 @@ textarea{
 
     <div class="panel">
       <div class="panel-title">输出</div>
-      <textarea id="output" readonly placeholder="处理后的结果会显示在这里"></textarea>
+      <div id="output" class="code-display"></div>
       <div class="status" id="outputStatus"></div>
     </div>
   </div>
@@ -268,6 +326,256 @@ function clearStatus(){
   outputStatus.innerHTML = '';
 }
 
+function highlightJSON(jsonStr){
+  // 建立括号配对映射
+  let bracketId = 0;
+  const bracketMap = new Map();
+  const stack = [];
+  
+  for(let i=0; i<jsonStr.length; i++){
+    const ch = jsonStr[i];
+    if(ch==='{'||ch==='['){
+      const id = bracketId++;
+      stack.push({id, pos:i});
+    }else if(ch==='}'||ch===']'){
+      if(stack.length>0){
+        const open = stack.pop();
+        bracketMap.set(open.pos, {pair:i, id:open.id, type:'open'});
+        bracketMap.set(i, {pair:open.pos, id:open.id, type:'close'});
+      }
+    }
+  }
+  
+  // 逐字符处理，生成 HTML
+  let result = '';
+  let dataId = 0;
+  let i = 0;
+  
+  while(i < jsonStr.length){
+    const ch = jsonStr[i];
+    
+    // 处理括号
+    if(ch==='{'||ch==='}'||ch==='['||ch===']'){
+      const info = bracketMap.get(i);
+      if(info){
+        result += '<span class="json-bracket" data-bracket-id="' + info.id + '" data-bracket-type="' + info.type + '" data-pair-pos="' + info.pair + '">' + ch + '</span>';
+      }else{
+        result += ch;
+      }
+      i++;
+    }
+    // 处理字符串（包括 key 和 value）
+    else if(ch==='"'){
+      let str = '"';
+      i++;
+      while(i < jsonStr.length){
+        const c = jsonStr[i];
+        str += c;
+        if(c==='"' && jsonStr[i-1]!=='\\'){
+          i++;
+          break;
+        }
+        i++;
+      }
+      // 判断是 key 还是 value
+      let j = i;
+      while(j < jsonStr.length && /\s/.test(jsonStr[j])) j++;
+      if(jsonStr[j]===':'){
+        result += '<span class="json-key json-data" data-id="' + (dataId++) + '">' + str + '</span>';
+      }else{
+        result += '<span class="json-string json-data" data-id="' + (dataId++) + '">' + str + '</span>';
+      }
+    }
+    // 处理数字
+    else if(/\d/.test(ch) || (ch==='-' && i+1<jsonStr.length && /\d/.test(jsonStr[i+1]))){
+      let num = '';
+      while(i < jsonStr.length && /[\d.\-]/.test(jsonStr[i])){
+        num += jsonStr[i];
+        i++;
+      }
+      result += '<span class="json-number json-data" data-id="' + (dataId++) + '">' + num + '</span>';
+    }
+    // 处理 true
+    else if(jsonStr.substr(i, 4)==='true'){
+      result += '<span class="json-boolean json-data" data-id="' + (dataId++) + '">true</span>';
+      i += 4;
+    }
+    // 处理 false
+    else if(jsonStr.substr(i, 5)==='false'){
+      result += '<span class="json-boolean json-data" data-id="' + (dataId++) + '">false</span>';
+      i += 5;
+    }
+    // 处理 null
+    else if(jsonStr.substr(i, 4)==='null'){
+      result += '<span class="json-null json-data" data-id="' + (dataId++) + '">null</span>';
+      i += 4;
+    }
+    // 其他字符直接输出
+    else{
+      result += ch;
+      i++;
+    }
+  }
+  
+  return result;
+}
+
+function setOutput(text, highlight=true){
+  if(highlight){
+    outputEl.innerHTML = highlightJSON(text);
+    setupBracketMatching();
+    setupInputOutputSync();
+  }else{
+    outputEl.textContent = text;
+  }
+}
+
+function setupBracketMatching(){
+  const brackets = outputEl.querySelectorAll('.json-bracket');
+  const dataNodes = outputEl.querySelectorAll('.json-data');
+  
+  // 括号点击：持久化高亮，清除数据高亮
+  brackets.forEach(br=>{
+    br.addEventListener('click', function(e){
+      e.stopPropagation();
+      
+      // 清除数据高亮
+      outputEl.querySelectorAll('.data-highlight').forEach(el=>el.classList.remove('data-highlight'));
+      
+      // 清除之前的括号高亮
+      outputEl.querySelectorAll('.bracket-match').forEach(el=>el.classList.remove('bracket-match'));
+      
+      const id = this.getAttribute('data-bracket-id');
+      
+      // 高亮当前和配对括号（持久化，不自动消失）
+      this.classList.add('bracket-match');
+      brackets.forEach(other=>{
+        if(other!==this && other.getAttribute('data-bracket-id')===id){
+          other.classList.add('bracket-match');
+        }
+      });
+    });
+  });
+  
+  // 数据节点点击：持久化高亮，清除括号高亮
+  dataNodes.forEach(node=>{
+    node.addEventListener('click', function(e){
+      e.stopPropagation();
+      
+      // 清除括号高亮
+      outputEl.querySelectorAll('.bracket-match').forEach(el=>el.classList.remove('bracket-match'));
+      
+      // 清除之前的数据高亮
+      outputEl.querySelectorAll('.data-highlight').forEach(el=>el.classList.remove('data-highlight'));
+      
+      // 高亮当前数据节点（持久化）
+      this.classList.add('data-highlight');
+    });
+  });
+  
+  // 输出区域点击空白处：清除所有高亮
+  outputEl.addEventListener('click', function(e){
+    if(e.target === outputEl){
+      outputEl.querySelectorAll('.bracket-match').forEach(el=>el.classList.remove('bracket-match'));
+      outputEl.querySelectorAll('.data-highlight').forEach(el=>el.classList.remove('data-highlight'));
+    }
+  });
+}
+
+// 左右联动高亮功能
+let syncListenersAttached = false;
+function setupInputOutputSync(){
+  // 避免重复绑定事件监听器
+  if(syncListenersAttached) return;
+  syncListenersAttached = true;
+  
+  inputEl.addEventListener('click', syncHighlight);
+  inputEl.addEventListener('keyup', syncHighlight);
+  inputEl.addEventListener('input', syncHighlight);
+  
+  function syncHighlight(){
+    const cursorPos = inputEl.selectionStart;
+    const inputText = inputEl.value;
+    
+    // 清除括号高亮（互斥）
+    outputEl.querySelectorAll('.bracket-match').forEach(el=>el.classList.remove('bracket-match'));
+    
+    // 清除之前的数据高亮
+    outputEl.querySelectorAll('.data-highlight').forEach(el=>el.classList.remove('data-highlight'));
+    
+    if(!inputText.trim()) return;
+    
+    let targetText = null;
+    let isKey = false;
+    
+    // 策略1: 检查光标是否在字符串内（包括引号）
+    let inString = false;
+    let stringStart = -1;
+    let stringEnd = -1;
+    
+    for(let i = 0; i < inputText.length; i++){
+      if(inputText[i] === '"' && (i === 0 || inputText[i-1] !== '\\')){
+        if(!inString){
+          stringStart = i;
+          inString = true;
+        }else{
+          stringEnd = i;
+          if(cursorPos >= stringStart && cursorPos <= stringEnd + 1){
+            // 光标在这个字符串内
+            targetText = inputText.substring(stringStart, stringEnd + 1);
+            // 检查是否是 key（后面跟冒号）
+            let j = stringEnd + 1;
+            while(j < inputText.length && /\s/.test(inputText[j])) j++;
+            if(inputText[j] === ':'){
+              isKey = true;
+            }
+            break;
+          }
+          inString = false;
+        }
+      }
+    }
+    
+    // 策略2: 如果不在字符串内，检查数字、布尔、null
+    if(!targetText){
+      // 向前查找 token 边界
+      let start = cursorPos;
+      while(start > 0 && /[\w.\-]/.test(inputText[start - 1])){
+        start--;
+      }
+      
+      // 向后查找 token 边界
+      let end = cursorPos;
+      while(end < inputText.length && /[\w.\-]/.test(inputText[end])){
+        end++;
+      }
+      
+      targetText = inputText.substring(start, end);
+    }
+    
+    if(targetText && targetText !== ''){
+      // 在输出区域查找对应的节点并高亮
+      const dataNodes = outputEl.querySelectorAll('.json-data');
+      
+      dataNodes.forEach(node=>{
+        const nodeText = node.textContent.trim();
+        
+        if(isKey){
+          // 光标在 key 上：匹配 key（可能带或不带冒号）
+          if(nodeText === targetText + ':' || nodeText === targetText){
+            node.classList.add('data-highlight');
+          }
+        }else{
+          // 光标在 value 上：精确匹配
+          if(nodeText === targetText){
+            node.classList.add('data-highlight');
+          }
+        }
+      });
+    }
+  }
+}
+
 function formatJSON(){
   clearStatus();
   const input = inputEl.value.trim();
@@ -277,7 +585,8 @@ function formatJSON(){
   }
   try{
     const obj = JSON.parse(input);
-    outputEl.value = JSON.stringify(obj, null, 2);
+    const formatted = JSON.stringify(obj, null, 2);
+    setOutput(formatted, true);
     setStatus(outputStatus, '格式化成功', 'success');
   }catch(e){
     setStatus(inputStatus, '解析失败: ' + e.message, 'error');
@@ -293,7 +602,8 @@ function compressJSON(){
   }
   try{
     const obj = JSON.parse(input);
-    outputEl.value = JSON.stringify(obj);
+    const compressed = JSON.stringify(obj);
+    setOutput(compressed, false);
     setStatus(outputStatus, '压缩成功', 'success');
   }catch(e){
     setStatus(inputStatus, '解析失败: ' + e.message, 'error');
@@ -310,7 +620,8 @@ function escapeJSON(){
   try{
     const obj = JSON.parse(input);
     const jsonStr = JSON.stringify(obj);
-    outputEl.value = JSON.stringify(jsonStr);
+    const escaped = JSON.stringify(jsonStr);
+    setOutput(escaped, false);
     setStatus(outputStatus, '转义成功（双引号已转义）', 'success');
   }catch(e){
     setStatus(inputStatus, '解析失败: ' + e.message, 'error');
@@ -328,10 +639,12 @@ function unescapeJSON(){
     const unescaped = JSON.parse(input);
     if(typeof unescaped === 'string'){
       const obj = JSON.parse(unescaped);
-      outputEl.value = JSON.stringify(obj, null, 2);
+      const formatted = JSON.stringify(obj, null, 2);
+      setOutput(formatted, true);
       setStatus(outputStatus, '反转义并格式化成功', 'success');
     }else{
-      outputEl.value = JSON.stringify(unescaped, null, 2);
+      const formatted = JSON.stringify(unescaped, null, 2);
+      setOutput(formatted, true);
       setStatus(outputStatus, '已格式化（输入未转义）', 'success');
     }
   }catch(e){
@@ -341,13 +654,13 @@ function unescapeJSON(){
 
 function clearAll(){
   inputEl.value = '';
-  outputEl.value = '';
+  outputEl.textContent = '';
   clearStatus();
   setStatus(inputStatus, '已清空', 'success');
 }
 
 function copyOutput(){
-  const text = outputEl.value;
+  const text = outputEl.textContent;
   if(!text){
     setStatus(outputStatus, '输出为空', 'error');
     return;
