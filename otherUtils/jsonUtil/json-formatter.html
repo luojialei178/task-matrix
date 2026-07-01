@@ -72,6 +72,7 @@ body.dark .json-bracket{color:rgba(255,255,255,.6);cursor:pointer;transition:bac
 body.dark .json-bracket:hover{background:rgba(255,255,255,.08);border-radius:2px;}
 body.dark .bracket-match{background:rgba(10,132,255,.25)!important;border-radius:2px;animation:bracketFlash .4s ease;}
 body.dark .data-highlight{background:rgba(255,193,7,.25)!important;border-radius:2px;animation:dataFlash .4s ease;}
+body.dark .json-error{background:rgba(255,69,58,.2)!important;color:#ff6b6b!important;border-bottom:2px solid #ff453a;}
 body.dark .status.error{color:#ff453a;}
 body.dark .status.success{color:#34c759;}
 
@@ -127,6 +128,7 @@ body.light .json-bracket{color:rgba(0,0,0,.5);cursor:pointer;transition:backgrou
 body.light .json-bracket:hover{background:rgba(0,0,0,.05);border-radius:2px;}
 body.light .bracket-match{background:rgba(10,122,255,.2)!important;border-radius:2px;animation:bracketFlash .4s ease;}
 body.light .data-highlight{background:rgba(255,193,7,.3)!important;border-radius:2px;animation:dataFlash .4s ease;}
+body.light .json-error{background:rgba(255,59,48,.15)!important;color:#d32f2f!important;border-bottom:2px solid #ff3b30;}
 body.light .status.error{color:#ff3b30;}
 body.light .status.success{color:#34c759;}
 
@@ -214,6 +216,24 @@ h1{
   margin-bottom:8px;
   text-transform:uppercase;
   letter-spacing:.5px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.btn-mini{
+  padding:4px 8px;
+  border-radius:4px;
+  font-size:11px;
+  font-weight:500;
+  cursor:pointer;
+  transition:all .12s;
+  border:none;
+  background:rgba(255,255,255,.08);
+  color:rgba(255,255,255,.65);
+}
+.btn-mini:hover{
+  background:rgba(255,255,255,.14);
+  color:rgba(255,255,255,.9);
 }
 textarea{
   flex:1;
@@ -238,9 +258,21 @@ textarea{
   overflow:auto;
   min-height:400px;
   border:1px solid;
-  white-space:pre;
+  white-space:pre-wrap;
   word-wrap:break-word;
   tab-size:2;
+  outline:none;
+}
+.code-display[contenteditable="true"]:focus{
+  border-color:rgba(10,122,255,.5);
+}
+.code-display:empty:before{
+  content:attr(placeholder);
+  color:rgba(255,255,255,.3);
+  pointer-events:none;
+}
+body.light .code-display:empty:before{
+  color:rgba(0,0,0,.3);
 }
 .json-key{font-weight:600;}
 .json-string{}
@@ -289,6 +321,7 @@ textarea{
       <button class="btn" onclick="compressJSON()">压缩 →</button>
       <button class="btn" onclick="escapeJSON()">转义 →</button>
       <button class="btn" onclick="unescapeJSON()">反转义 →</button>
+      <button class="btn" onclick="reverseFormat()">← 反向</button>
       <button class="btn" onclick="clearAll()">清空</button>
       <button class="btn" onclick="copyOutput()">复制输出</button>
     </div>
@@ -297,13 +330,16 @@ textarea{
   <div class="panels">
     <div class="panel">
       <div class="panel-title">输入</div>
-      <textarea id="input" placeholder='粘贴 JSON 数据，例如：{"name":"测试","value":123}'></textarea>
+      <div id="input" class="code-display" contenteditable="true" placeholder='粘贴 JSON 数据，例如：{"name":"测试","value":123}'></div>
       <div class="status" id="inputStatus"></div>
     </div>
 
     <div class="panel">
-      <div class="panel-title">输出</div>
-      <div id="output" class="code-display"></div>
+      <div class="panel-title">
+        输出
+        <button class="btn-mini" onclick="formatOutput()" title="格式化输出框内容">🔄 格式化输出框</button>
+      </div>
+      <div id="output" class="code-display" contenteditable="true"></div>
       <div class="status" id="outputStatus"></div>
     </div>
   </div>
@@ -495,7 +531,7 @@ function setupInputOutputSync(){
   
   function syncHighlight(){
     const cursorPos = inputEl.selectionStart;
-    const inputText = inputEl.value;
+    const inputText = inputEl.textContent;
     
     // 清除括号高亮（互斥）
     outputEl.querySelectorAll('.bracket-match').forEach(el=>el.classList.remove('bracket-match'));
@@ -578,7 +614,7 @@ function setupInputOutputSync(){
 
 function formatJSON(){
   clearStatus();
-  const input = inputEl.value.trim();
+  const input = inputEl.textContent.trim();
   if(!input){
     setStatus(inputStatus, '输入为空', 'error');
     return;
@@ -588,14 +624,128 @@ function formatJSON(){
     const formatted = JSON.stringify(obj, null, 2);
     setOutput(formatted, true);
     setStatus(outputStatus, '格式化成功', 'success');
+    // 清除输入框的错误标记
+    inputEl.innerHTML = escapeHtml(input);
   }catch(e){
-    setStatus(inputStatus, '解析失败: ' + e.message, 'error');
+    // 容错格式化：在输入框和输出框都标记错误
+    const errorMsg = e.message.replace(/\s+at position \d+/i, '').replace(/\s+in JSON at position \d+/i, '');
+    setStatus(inputStatus, errorMsg, 'error');
+    
+    // 在输入框内标记错误
+    const errorMatch = e.message.match(/position (\d+)/);
+    const errorPos = errorMatch ? parseInt(errorMatch[1]) : -1;
+    
+    if(errorPos !== -1 && errorPos < input.length){
+      // 在输入框标记错误位置
+      const before = escapeHtml(input.substring(0, errorPos));
+      const errorChar = input.substring(errorPos, errorPos + 10); // 取错误位置后10个字符
+      const after = escapeHtml(input.substring(errorPos + 10));
+      inputEl.innerHTML = before + '<span class="json-error" title="错误位置">' + escapeHtml(errorChar) + '</span>' + after;
+    }
+    
+    // 尝试部分格式化输出
+    try{
+      let formatted = '';
+      let indent = 0;
+      let inString = false;
+      let errorMarked = false;
+      
+      for(let i = 0; i < input.length; i++){
+        const ch = input[i];
+        const isErrorPos = (errorPos !== -1 && i >= errorPos && i < errorPos + 10 && !errorMarked);
+        
+        if(ch === '"' && (i === 0 || input[i-1] !== '\\')){
+          inString = !inString;
+        }
+        
+        if(isErrorPos){
+          formatted += '<span class="json-error" title="错误位置">';
+          errorMarked = true;
+        }
+        
+        if(!inString){
+          if(ch === '{' || ch === '['){
+            formatted += ch + '\n' + '  '.repeat(++indent);
+          }else if(ch === '}' || ch === ']'){
+            formatted += '\n' + '  '.repeat(--indent) + ch;
+          }else if(ch === ','){
+            formatted += ch + '\n' + '  '.repeat(indent);
+          }else if(ch === ':'){
+            formatted += ': ';
+          }else if(!/\s/.test(ch)){
+            formatted += ch;
+          }
+        }else{
+          formatted += ch;
+        }
+        
+        if(errorMarked && i >= errorPos + 9){
+          formatted += '</span>';
+          errorMarked = false;
+        }
+      }
+      
+      if(errorMarked){
+        formatted += '</span>';
+      }
+      
+      outputEl.innerHTML = formatted;
+      setStatus(outputStatus, '部分格式化（有错误）', 'error');
+    }catch(err){
+      outputEl.textContent = input;
+      setStatus(outputStatus, '无法格式化', 'error');
+    }
+  }
+}
+
+function escapeHtml(text){
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function reverseFormat(){
+  clearStatus();
+  const outputText = outputEl.textContent.trim();
+  if(!outputText){
+    setStatus(outputStatus, '输出为空', 'error');
+    return;
+  }
+  try{
+    // 解析输出区的 JSON
+    const obj = JSON.parse(outputText);
+    // 压缩后输出回输入框（恢复原格式）
+    const compressed = JSON.stringify(obj);
+    inputEl.textContent = compressed;
+    setStatus(inputStatus, '已反向输出（压缩格式）', 'success');
+  }catch(e){
+    const errorMsg = e.message.replace(/\s+at position \d+/i, '').replace(/\s+in JSON at position \d+/i, '');
+    setStatus(outputStatus, '输出区 JSON 无效: ' + errorMsg, 'error');
+  }
+}
+
+function formatOutput(){
+  clearStatus();
+  const outputText = outputEl.textContent.trim();
+  if(!outputText){
+    setStatus(outputStatus, '输出为空', 'error');
+    return;
+  }
+  try{
+    // 解析并格式化输出区的内容
+    const obj = JSON.parse(outputText);
+    const formatted = JSON.stringify(obj, null, 2);
+    setOutput(formatted, true);
+    setStatus(outputStatus, '输出框格式化成功', 'success');
+  }catch(e){
+    const errorMsg = e.message.replace(/\s+at position \d+/i, '').replace(/\s+in JSON at position \d+/i, '');
+    setStatus(outputStatus, '输出框 JSON 无效: ' + errorMsg, 'error');
   }
 }
 
 function compressJSON(){
   clearStatus();
-  const input = inputEl.value.trim();
+  const input = inputEl.textContent.trim();
   if(!input){
     setStatus(inputStatus, '输入为空', 'error');
     return;
@@ -612,7 +762,7 @@ function compressJSON(){
 
 function escapeJSON(){
   clearStatus();
-  const input = inputEl.value.trim();
+  const input = inputEl.textContent.trim();
   if(!input){
     setStatus(inputStatus, '输入为空', 'error');
     return;
@@ -630,7 +780,7 @@ function escapeJSON(){
 
 function unescapeJSON(){
   clearStatus();
-  const input = inputEl.value.trim();
+  const input = inputEl.textContent.trim();
   if(!input){
     setStatus(inputStatus, '输入为空', 'error');
     return;
@@ -653,7 +803,7 @@ function unescapeJSON(){
 }
 
 function clearAll(){
-  inputEl.value = '';
+  inputEl.textContent = '';
   outputEl.textContent = '';
   clearStatus();
   setStatus(inputStatus, '已清空', 'success');
