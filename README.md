@@ -23,8 +23,16 @@
 │   ├── README.md                     # 工具说明
 │   └── CONTEXT.md                    # 历史上下文或会话总结
 └── otherUtils/                       # 其他独立辅助工具
-    └── jsonUtil/                     # JSON 格式化、压缩、转义与反转义工具
-        ├── json-formatter.html       # 单文件工具本体
+    ├── jsonUtil/                     # JSON 格式化、压缩、转义与反转义工具
+    │   ├── json-formatter.html       # 单文件工具本体
+    │   ├── README.md                 # 工具说明
+    │   └── CONTEXT.md                # 开发上下文与版本记录
+    ├── markdownUtil/                 # Markdown 编辑、预览与打印工具
+    │   ├── markdown-editor.html      # 单文件工具本体
+    │   ├── README.md                 # 工具说明
+    │   └── CONTEXT.md                # 开发上下文与版本记录
+    └── logUtil/                      # 文本日志与 Java 异常分析工具
+        ├── log-analyzer.html         # 单文件工具本体
         ├── README.md                 # 工具说明
         └── CONTEXT.md                # 开发上下文与版本记录
 ```
@@ -34,6 +42,8 @@
 - **task-matrix**：二维任务优先级矩阵，支持任务卡片、拖拽、动态行列、主题切换及 JSON 导入导出。
 - **otherUtils**：非核心但可独立使用的开发与办公辅助工具集合。
 - **otherUtils/jsonUtil**：JSON 格式化工具，支持格式化、压缩、转义、反转义、容错提示及双向数据同步。
+- **otherUtils/markdownUtil**：Markdown 编辑器与浏览器，支持文件拖放、实时预览、目录导航及打印为 PDF。
+- **otherUtils/logUtil**：离线日志分析器，支持大文件分块读取、筛选统计、Java 异常归组及结果导出。
 
 ## 统一命名规范
 
