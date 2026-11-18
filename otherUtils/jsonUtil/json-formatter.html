@@ -14,7 +14,7 @@
 body{
   font-family:var(--font);
   padding:20px;
-  min-height:100vh;
+  height:100vh;
   display:flex;
   flex-direction:column;
   -webkit-font-smoothing:antialiased;
@@ -77,6 +77,7 @@ body.dark .data-highlight{background:rgba(255,193,7,.25)!important;border-radius
 body.dark .json-error{background:rgba(255,69,58,.2)!important;color:#ff6b6b!important;border-bottom:2px solid #ff453a;}
 body.dark .status.error{color:#ff453a;}
 body.dark .status.success{color:#34c759;}
+body.dark .splitter::before{background:rgba(255,255,255,.12);}
 
 /* ══════════════════════════════════
    LIGHT
@@ -133,6 +134,7 @@ body.light .data-highlight{background:rgba(255,193,7,.3)!important;border-radius
 body.light .json-error{background:rgba(255,59,48,.15)!important;color:#d32f2f!important;border-bottom:2px solid #ff3b30;}
 body.light .status.error{color:#ff3b30;}
 body.light .status.success{color:#34c759;}
+body.light .splitter::before{background:rgba(0,0,0,.15);}
 
 /* ══════════════════════════════════
    SHARED STRUCTURAL
@@ -145,6 +147,7 @@ body.light .status.success{color:#34c759;}
   flex-direction:column;
   gap:16px;
   flex:1;
+  min-height:0;
 }
 .header{
   display:flex;
@@ -199,11 +202,10 @@ h1{
   border:none;
 }
 .panels{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:16px;
+  --split:50%;
+  display:flex;
   flex:1;
-  min-height:0;
+  min-height:400px;
 }
 .panel{
   display:flex;
@@ -211,7 +213,33 @@ h1{
   border-radius:var(--radius-md);
   padding:12px;
   min-height:0;
+  min-width:0;
 }
+/* 面板宽度只由分隔条决定，不随内容撑开 */
+.panel-input{flex:0 0 calc(var(--split) - 8px);}
+.panel-output{flex:1 1 0;}
+.splitter{
+  flex:0 0 16px;
+  position:relative;
+  cursor:col-resize;
+  touch-action:none;
+  outline:none;
+}
+.splitter::before{
+  content:'';
+  position:absolute;
+  top:0;
+  bottom:0;
+  left:50%;
+  width:2px;
+  margin-left:-1px;
+  border-radius:1px;
+  transition:background .15s;
+}
+.splitter:hover::before,
+.splitter:focus-visible::before,
+.splitter.dragging::before{background:#0a7aff!important;}
+body.resizing{cursor:col-resize;user-select:none;}
 .panel-title{
   font-size:11px;
   font-weight:600;
@@ -258,10 +286,10 @@ textarea{
   font-size:13px;
   line-height:1.6;
   overflow:auto;
-  min-height:400px;
+  min-height:0;
   border:1px solid;
   white-space:pre-wrap;
-  word-wrap:break-word;
+  overflow-wrap:anywhere;
   tab-size:2;
   outline:none;
 }
@@ -299,9 +327,10 @@ body.light .code-display:empty:before{
   font-size:14px;
 }
 @media(max-width:768px){
-  .panels{
-    grid-template-columns:1fr;
-  }
+  body{height:auto;min-height:100vh;}
+  .panels{flex-direction:column;gap:16px;}
+  .panel-input,.panel-output{flex:none;height:60vh;}
+  .splitter{display:none;}
 }
 </style>
 </head>
@@ -327,13 +356,15 @@ body.light .code-display:empty:before{
   </div>
 
   <div class="panels">
-    <div class="panel">
+    <div class="panel panel-input">
       <div class="panel-title">输入</div>
       <div id="input" class="code-display" contenteditable="true" placeholder='粘贴 JSON 数据，例如：{"name":"测试","value":123}'></div>
       <div class="status" id="inputStatus"></div>
     </div>
 
-    <div class="panel">
+    <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" tabindex="0" title="拖动调整宽度，双击恢复均分"></div>
+
+    <div class="panel panel-output">
       <div class="panel-title">
         输出
         <button class="btn-mini" onclick="formatOutput()" title="格式化输出框内容">🔄 格式化输出框</button>
@@ -1016,6 +1047,44 @@ function applyTheme(t){
 applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
 document.getElementById('themeDot').addEventListener('click', ()=>{
   applyTheme(document.body.classList.contains('dark') ? 'light' : 'dark');
+});
+
+// 输入/输出面板拖拽分隔
+const SPLIT_KEY = 'json-formatter-split';
+const panelsEl = document.querySelector('.panels');
+const splitterEl = document.getElementById('splitter');
+function applySplit(pct, save){
+  pct = Math.min(80, Math.max(20, pct));
+  panelsEl.style.setProperty('--split', pct + '%');
+  if(save) localStorage.setItem(SPLIT_KEY, pct);
+}
+applySplit(parseFloat(localStorage.getItem(SPLIT_KEY)) || 50, false);
+
+splitterEl.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  splitterEl.setPointerCapture(e.pointerId);
+  splitterEl.classList.add('dragging');
+  document.body.classList.add('resizing');
+});
+splitterEl.addEventListener('pointermove', e=>{
+  if(!splitterEl.hasPointerCapture(e.pointerId)) return;
+  const rect = panelsEl.getBoundingClientRect();
+  applySplit((e.clientX - rect.left) / rect.width * 100, false);
+});
+function endDrag(e){
+  if(!splitterEl.classList.contains('dragging')) return;
+  splitterEl.classList.remove('dragging');
+  document.body.classList.remove('resizing');
+  applySplit(parseFloat(panelsEl.style.getPropertyValue('--split')), true);
+}
+splitterEl.addEventListener('pointerup', endDrag);
+splitterEl.addEventListener('pointercancel', endDrag);
+splitterEl.addEventListener('dblclick', ()=>applySplit(50, true));
+splitterEl.addEventListener('keydown', e=>{
+  if(e.key!=='ArrowLeft' && e.key!=='ArrowRight') return;
+  e.preventDefault();
+  const cur = parseFloat(panelsEl.style.getPropertyValue('--split')) || 50;
+  applySplit(cur + (e.key==='ArrowLeft' ? -2 : 2), true);
 });
 </script>
 </body>
