@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>地址门户 · 网站授权</title>
+<link rel="stylesheet" href="popup.css">
+<script src="popup.js" defer></script>
+</head>
+<body>
+<h1>地址门户 · 跳转填充</h1>
+<p id="site">正在检查当前网站…</p>
+<button id="grant" type="button" disabled>允许填充此网站</button>
+<button id="revoke" type="button" hidden>取消此网站授权</button>
+<p id="status" role="status" aria-live="polite"></p>
+<button id="detect" class="secondary" type="button" disabled>检测登录框（不读取账号密码）</button>
+<p id="diagnostic" role="status" aria-live="polite" hidden></p>
+<p class="hint">仅由地址门户 HTML 卡片「跳转」触发，以登记的账号密码覆盖登录框已有值。跨域登录请在卡片登记最终「登录域」，并在此最终登录页授权。此弹窗只管理网站授权和无凭据检测，普通打开、刷新或检测不会填充；不自动登录、无凭据存储功能。适用于 Chrome 125 及以上。</p>
+<p id="fileHint" class="hint" hidden>还需在扩展详情中开启「允许访问文件网址」，然后刷新本地地址门户。</p>
+<button id="details" class="secondary" type="button">扩展详情</button>
+</body>
+</html>

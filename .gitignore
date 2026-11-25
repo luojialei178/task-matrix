@@ -1,3 +1,5 @@
 .DS_Store
 task-matrix.json
 /workspace/
+/otherUtils/pswdUtil/password-manager*.json
+/otherUtils/pswdUtil/bookmarks_*.html

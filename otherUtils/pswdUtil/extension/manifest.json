@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "地址门户 · 跳转填充",
+  "version": "1.0.7",
+  "description": "适用于 Chrome 125 及以上，仅在本地地址门户跳转时以登记账号密码覆盖登录框，不自动提交、无凭据存储功能。",
+  "minimum_chrome_version": "125",
+  "permissions": ["tabs", "scripting"],
+  "host_permissions": ["file:///*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": {"service_worker": "background.js"},
+  "action": {"default_title": "地址门户 · 网站授权", "default_popup": "popup.html"},
+  "content_scripts": [{
+    "matches": ["file:///*"],
+    "js": ["bridge.js"],
+    "run_at": "document_start",
+    "all_frames": false
+  }],
+  "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'none'"}
+}
